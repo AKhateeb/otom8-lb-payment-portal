@@ -13,10 +13,16 @@ export const apiClient = axios.create({
 
 export function describeApiError(error) {
   const status = error?.response?.status
+  const responseData = error?.response?.data
+  const backendCode =
+    responseData?.data?.error ||
+    responseData?.error ||
+    responseData?.errors?.[0]?.extensions?.code
   const backendMessage =
-    error?.response?.data?.message ||
-    error?.response?.data?.errors?.[0]?.message ||
-    error?.response?.data?.errors?.[0]?.extensions?.code ||
+    responseData?.data?.message ||
+    responseData?.message ||
+    responseData?.errors?.[0]?.message ||
+    backendCode ||
     error?.message ||
     'Unknown error'
 
@@ -25,7 +31,8 @@ export function describeApiError(error) {
     method: error?.config?.method?.toUpperCase(),
     url: `${error?.config?.baseURL || ''}${error?.config?.url || ''}`,
     backendMessage,
-    backendCode: error?.response?.data?.errors?.[0]?.extensions?.code,
+    backendCode,
+    responseBody: responseData,
     requestBody: error?.config?.data,
   }
 }

@@ -2,45 +2,46 @@
   <div class="space-y-5">
     <div>
       <h2 class="text-2xl font-black">{{ store.t.methodTitle }}</h2>
-      <p class="mt-2 text-sm text-[#60706b]">{{ store.registeredPhone }}</p>
+      <p class="mt-2 text-sm leading-6 text-[#6B6756]">{{ store.t.methodSubtitle }}</p>
     </div>
     <div class="grid gap-3">
       <button
         v-for="method in store.methods"
         :key="method.id"
-        class="flex items-center gap-4 rounded-lg border p-4 text-start transition hover:border-[#21C063] hover:bg-[#f7fcf8]"
-        :class="store.selectedMethod?.id === method.id ? 'border-[#21C063] bg-[#eff8f1]' : 'border-[#e1ece5] bg-white'"
-        @click="select(method)"
+        class="flex items-center gap-4 rounded-lg border p-4 text-start transition hover:border-[#FACE0B] hover:bg-[#FFF8D7]"
+        :class="store.selectedMethod?.id === method.id ? 'border-[#202020] bg-[#FFF8D7]' : 'border-[#EFE6B8] bg-white'"
+        @click="store.selectMethod(method)"
       >
-        <img :src="method.icon" :alt="method.title" class="h-12 w-12 rounded-md object-contain" />
-        <span class="flex-1">
-          <span class="block font-black">{{ method.title }}</span>
-          <span class="mt-1 block text-sm text-[#60706b]">{{ method.subtitle }}</span>
+        <span
+          v-if="method.icons?.length"
+          class="relative block h-12 w-14 shrink-0"
+          role="img"
+          :aria-label="method.title"
+        >
+          <img
+            :src="method.icons[0]"
+            alt=""
+            class="absolute start-0 top-1/2 h-10 w-10 -translate-y-1/2 rounded-lg object-contain ring-2 ring-white"
+          />
+          <img
+            :src="method.icons[1]"
+            alt=""
+            class="absolute end-0 top-1/2 h-10 w-10 -translate-y-1/2 rounded-lg object-contain ring-2 ring-white"
+          />
         </span>
-        <ChevronRight class="h-5 w-5 text-[#21C063]" />
+        <img v-else :src="method.icon" :alt="method.title" class="h-12 w-12 shrink-0 rounded-md object-contain" />
+        <span class="min-w-0 flex-1">
+          <span class="block font-black">{{ method.title }}</span>
+        </span>
+        <ChevronRight class="h-5 w-5 shrink-0 text-[#202020]" />
       </button>
-    </div>
-    <div class="flex gap-3">
-      <AppButton variant="secondary" @click="store.setStep('phone')">{{ store.t.back }}</AppButton>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ChevronRight } from 'lucide-vue-next'
-import AppButton from '@/components/AppButton.vue'
 import { usePortalStore } from '@/stores/portalStore'
 
 const store = usePortalStore()
-
-async function select(method) {
-  store.selectedMethod = method
-  if (method.type === 'promo') {
-    store.selectedBundle = null
-    store.setStep('details')
-    return
-  }
-  await store.loadBundles()
-  store.setStep('bundle')
-}
 </script>

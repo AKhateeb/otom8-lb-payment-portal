@@ -13,7 +13,10 @@ export const router = createRouter({
 
 router.beforeEach(() => {
   const store = usePortalStore()
-  if (!store.registeredPhone && !['welcome', 'phone'].includes(store.currentStep)) {
+  if (!store.selectedMethod && !['welcome', 'method'].includes(store.currentStep)) {
+    store.setStep('method')
+  }
+  if (!store.registeredPhone && !['welcome', 'method', 'phone'].includes(store.currentStep)) {
     store.setStep('phone')
   }
 })

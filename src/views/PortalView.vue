@@ -1,63 +1,54 @@
 <template>
-  <main :dir="store.isRtl ? 'rtl' : 'ltr'" class="min-h-svh text-[#182326]">
+  <main :dir="store.isRtl ? 'rtl' : 'ltr'" class="min-h-svh text-[#202020]">
     <LiveBackground />
-    <div class="mx-auto flex min-h-svh w-full max-w-6xl flex-col px-4 py-5 sm:px-6 lg:px-8">
+    <div class="mx-auto flex min-h-svh w-full max-w-2xl flex-col px-4 py-4 sm:px-6">
       <header class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <div class="grid h-12 w-12 place-items-center rounded-xl bg-[#182326] p-2 shadow-lg shadow-emerald-950/15">
-            <img :src="config.identity.logo" :alt="config.identity.appName" class="h-full w-full object-contain" />
-          </div>
-          <div>
-            <p class="text-sm font-bold text-[#182326]">{{ config.identity.portalName }}</p>
-            <p class="text-xs text-[#60706b]">{{ config.identity.domainHint }}</p>
-          </div>
+        <div class="flex items-center">
+          <img :src="config.identity.splashLogo" :alt="config.identity.appName" class="h-20 w-20 object-contain sm:h-24 sm:w-24" />
         </div>
         <div class="flex items-center gap-2">
-          <span v-if="config.isDebug" class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Debug</span>
-          <button class="rounded-full border border-[#d9e7dd] bg-white px-3 py-1 text-sm font-bold" @click="store.lang = store.lang === 'ar' ? 'en' : 'ar'">
-            {{ store.lang === 'ar' ? 'EN' : 'AR' }}
+          <span v-if="config.isDebug" class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{{ store.t.debugMode }}</span>
+          <button class="rounded-full border border-[#EFE6B8] bg-white px-3 py-1 text-sm font-bold" @click="store.lang = store.lang === 'ar' ? 'en' : 'ar'">
+            {{ store.lang === 'ar' ? 'English' : 'العربية' }}
           </button>
         </div>
       </header>
 
-      <section class="grid flex-1 items-center gap-7 py-8 lg:grid-cols-[0.92fr_1.08fr]">
-        <aside class="space-y-6">
-          <div>
-            <div class="mb-5 grid h-24 w-24 place-items-center rounded-2xl bg-[#182326] p-3 shadow-xl shadow-emerald-950/15">
-              <img :src="config.identity.splashLogo" :alt="config.identity.appName" class="h-full w-full object-contain" />
-            </div>
-            <h1 class="max-w-xl text-4xl font-black leading-tight text-[#14201d] sm:text-5xl">
-              {{ store.lang === 'ar' ? config.identity.titleAr : config.identity.title }}
-            </h1>
-            <p class="mt-4 max-w-lg text-base leading-7 text-[#60706b]">
-              {{ store.lang === 'ar' ? config.identity.subtitleAr : config.identity.subtitle }}
-            </p>
+      <section class="flex flex-1 flex-col justify-center gap-5 py-6">
+        <section class="rounded-xl border border-white/80 bg-white/94 p-4 shadow-2xl shadow-yellow-950/10 backdrop-blur sm:p-6">
+          <div v-if="showBackButton" class="mb-4 flex">
+            <button
+              class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#E5D98E] bg-[#FFF8D7] px-4 text-sm font-black text-[#202020] transition hover:border-[#202020] hover:bg-[#FACE0B] focus:outline-none focus:ring-2 focus:ring-[#FACE0B] focus:ring-offset-2 disabled:opacity-50"
+              :disabled="store.loading"
+              @click="goBack"
+            >
+              <ArrowLeft v-if="!store.isRtl" class="h-4 w-4" />
+              <ArrowRight v-else class="h-4 w-4" />
+              {{ store.t.back }}
+            </button>
           </div>
-          <div class="h-2 overflow-hidden rounded-full bg-white shadow-inner">
-            <div class="h-full rounded-full bg-[#21C063] transition-all duration-500" :style="{ width: `${store.progress}%` }" />
-          </div>
-          <div class="grid grid-cols-3 gap-2 text-xs font-bold text-[#60706b]">
-            <span>{{ store.t.registeredPhone }}</span>
-            <span>{{ store.t.method }}</span>
-            <span>{{ store.t.confirmPayment }}</span>
-          </div>
-        </aside>
 
-        <section class="rounded-2xl border border-white/80 bg-white/92 p-4 shadow-2xl shadow-emerald-950/10 backdrop-blur sm:p-6">
-          <div v-if="store.loading" class="mb-4 flex items-center gap-3 rounded-lg border border-[#d9e7dd] bg-[#f7fcf8] p-3 text-sm font-semibold text-[#182326]">
-            <LoaderCircle class="h-5 w-5 animate-spin text-[#21C063]" />
-            {{ store.loadingMessage || 'Loading...' }}
+          <div class="mb-5">
+            <div class="h-2 overflow-hidden rounded-full bg-[#F6F0CC] shadow-inner">
+              <div class="h-full rounded-full bg-[#FACE0B] transition-all duration-500" :style="{ width: `${store.progress}%` }" />
+            </div>
+          </div>
+
+          <div v-if="store.loading" class="mb-4 flex items-center gap-3 rounded-lg border border-[#EFE6B8] bg-[#FFF8D7] p-3 text-sm font-semibold text-[#202020]">
+            <LoaderCircle class="h-5 w-5 animate-spin text-[#202020]" />
+            {{ store.loadingMessage || store.t.loading }}
           </div>
           <div v-if="store.error" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">
             {{ store.error === 'friendly' ? store.t.friendlyError : store.error }}
           </div>
 
           <WelcomeStep v-if="store.currentStep === 'welcome'" />
-          <PhoneStep v-else-if="store.currentStep === 'phone'" />
           <MethodStep v-else-if="store.currentStep === 'method'" />
-          <BundleStep v-else-if="store.currentStep === 'bundle'" />
+          <PhoneStep v-else-if="store.currentStep === 'phone'" />
+          <BundleStep v-else-if="store.currentStep === 'plan'" />
           <DetailsStep v-else-if="store.currentStep === 'details'" />
           <SummaryStep v-else-if="store.currentStep === 'summary'" />
+          <PaymentStep v-else-if="store.currentStep === 'payment'" />
           <SuccessStep v-else />
 
           <details v-if="config.isDebug && store.debugEvents.length" class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
@@ -68,14 +59,73 @@
             </div>
           </details>
         </section>
+
+        <aside
+          v-if="showSmsDebugPanel"
+          class="rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 p-4 text-amber-950 shadow-lg shadow-amber-950/5"
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p class="text-xs font-black uppercase tracking-wider text-amber-700">{{ store.t.debugOnly }}</p>
+              <h2 class="mt-1 font-black">{{ store.t.debugSmsTitle }}</h2>
+              <p class="mt-1 text-sm">{{ store.t.debugSmsBody }}</p>
+            </div>
+            <button
+              class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-amber-900 px-5 text-sm font-black text-amber-50 hover:bg-amber-950 disabled:opacity-50"
+              :disabled="store.loading || store.smsAwaitingConfirmation"
+              @click="store.sendSmsDebugWebhook()"
+            >
+              {{ store.t.debugWebhook }}
+            </button>
+          </div>
+        </aside>
       </section>
+
+      <footer class="flex flex-wrap items-center justify-center gap-3 pb-4">
+        <a
+          :href="config.identity.websiteUrl"
+          target="_blank"
+          rel="noreferrer"
+          class="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#EFE6B8] bg-white px-3 text-sm font-bold text-[#202020] hover:border-[#202020]"
+        >
+          <Globe class="h-4 w-4" />
+          {{ store.t.websiteLink }}
+        </a>
+        <a
+          :href="config.identity.whatsappUrl"
+          target="_blank"
+          rel="noreferrer"
+          class="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#EFE6B8] bg-white px-3 text-sm font-bold text-[#202020] hover:border-[#25D366] hover:bg-[#25D366]/5"
+        >
+          <img src="/assets/payment/whatsapp.svg" alt="" class="h-5 w-5 shrink-0" />
+          {{ store.t.contactUs }}
+        </a>
+        <a
+          :href="legalUrl('terms-of-use')"
+          target="_blank"
+          rel="noreferrer"
+          class="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#EFE6B8] bg-white px-3 text-sm font-bold text-[#202020] hover:border-[#202020]"
+        >
+          <FileText class="h-4 w-4" />
+          {{ store.t.termsOfUse }}
+        </a>
+        <a
+          :href="legalUrl('privacy-policy')"
+          target="_blank"
+          rel="noreferrer"
+          class="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#EFE6B8] bg-white px-3 text-sm font-bold text-[#202020] hover:border-[#202020]"
+        >
+          <ShieldCheck class="h-4 w-4" />
+          {{ store.t.privacyPolicy }}
+        </a>
+      </footer>
     </div>
   </main>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
-import { LoaderCircle } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { ArrowLeft, ArrowRight, FileText, Globe, LoaderCircle, ShieldCheck } from 'lucide-vue-next'
 import LiveBackground from '@/components/LiveBackground.vue'
 import { appConfig as config } from '@/config/appConfig'
 import { usePortalStore } from '@/stores/portalStore'
@@ -84,13 +134,57 @@ import PhoneStep from './steps/PhoneStep.vue'
 import MethodStep from './steps/MethodStep.vue'
 import BundleStep from './steps/BundleStep.vue'
 import DetailsStep from './steps/DetailsStep.vue'
+import PaymentStep from './steps/PaymentStep.vue'
 import SummaryStep from './steps/SummaryStep.vue'
 import SuccessStep from './steps/SuccessStep.vue'
 
 const store = usePortalStore()
+const showBackButton = computed(() => !['welcome', 'success'].includes(store.currentStep))
+const showSmsDebugPanel = computed(
+  () =>
+    config.isDebug &&
+    config.debugSmsWebhookEnabled &&
+    store.currentStep === 'payment' &&
+    store.selectedMethod?.type === 'sms' &&
+    Boolean(store.payment?.id),
+)
+
+function goBack() {
+  const defaultBackSteps = {
+    method: 'welcome',
+    phone: 'method',
+    plan: 'phone',
+    details: 'plan',
+  }
+
+  if (store.currentStep === 'summary') {
+    store.setStep(store.selectedMethod?.type === 'sms' ? 'details' : store.selectedMethod?.type === 'promo' ? 'phone' : 'plan')
+    return
+  }
+
+  if (store.currentStep === 'payment') {
+    if (store.selectedMethod?.type === 'promo') {
+      store.setStep('phone')
+      return
+    }
+    if (store.selectedMethod?.type === 'sms') {
+      store.setStep('details')
+      return
+    }
+    store.setStep(config.showSummaryStep ? 'summary' : 'plan')
+    return
+  }
+
+  store.setStep(defaultBackSteps[store.currentStep] || 'welcome')
+}
+
+function legalUrl(slug) {
+  const langPrefix = store.lang === 'ar' ? '/ar' : ''
+  return `https://ejet-elkahraba.com${langPrefix}/${slug}/`
+}
 
 function beforeUnload(event) {
-  if (!store.hasDirtyInput || store.currentStep === 'success') return
+  if (!store.hasDirtyInput || store.currentStep === 'success' || store.leavingForPayment) return
   event.preventDefault()
   event.returnValue = ''
 }

@@ -7,88 +7,116 @@ const listData = (body) => {
   return Array.isArray(data) ? data : []
 }
 
-export async function getBundles() {
-  const response = await apiClient.get(appConfig.payment.endpoints.bundles)
-  return listData(response).filter((bundle) => Number(bundle.amount) > 0 && Number(bundle.credits) > 0)
+const formatMoney = (value) => Number.parseFloat(Number(value || 0).toFixed(2))
+
+function planDuration(days, lang) {
+  const isArabic = lang === 'ar'
+  if (days >= 365) return isArabic ? 'سنة واحدة' : '1 year'
+  if (days >= 30 && days % 30 === 0) {
+    const months = days / 30
+    if (isArabic) return months === 1 ? 'شهر واحد' : `${months} أشهر`
+    return months === 1 ? '1 month' : `${months} months`
+  }
+  return isArabic ? `${days} يوم` : `${days} days`
 }
 
-export async function createDraftPayment({ amount, method, registeredPhone, senderPhone, bundleId }) {
+function basePlanName(name, lang) {
+  const fallback = lang === 'ar' ? 'الباقة الأساسية' : 'Basic Plan'
+  return String(name || fallback).replace(/\s*\([^)]*\)\s*$/, '').trim()
+}
+
+export async function getPlans(lang = 'en') {
+  const locale = lang === 'ar' ? 'ar-SA' : 'en-US'
+  const response = await apiClient.get(appConfig.payment.endpoints.plans(locale))
+  const rows = listData(response)
+  return rows
+    .map((row) => {
+      const currentValue = Number(row.current_value || 0)
+      const previousValue = Number(row.previous_value || 0)
+      const translatedName = Array.isArray(row.tr) ? row.tr[0]?.name : ''
+      const renewInDays = Number(row.renew_in_days || 0)
+
+      return {
+        id: String(row.id),
+        planId: row.id,
+        name: basePlanName(translatedName, lang),
+        renewInDays,
+        durationLabel: planDuration(renewInDays, lang),
+        months: renewInDays >= 365 ? 12 : Math.max(1, Math.round(renewInDays / 30)),
+        amount: formatMoney(currentValue),
+        oldAmount: previousValue > currentValue ? formatMoney(previousValue) : 0,
+      }
+    })
+    .filter((plan) => Number(plan.amount) > 0)
+}
+
+export async function createDraftPayment({ amount, method, registeredPhone, senderPhone }) {
   const response = await apiClient.post(appConfig.payment.endpoints.draftPayment, {
     method,
     amount,
-    currency: appConfig.payment.currency,
     user_phone: registeredPhone,
     phone_number: registeredPhone,
     sender_phone: senderPhone || registeredPhone,
-    bundle: bundleId || null,
-    source: appConfig.payment.promoSource,
-    status: 'draft',
   })
   return unwrapData(response)
 }
 
-export async function createWhishPayment({ amount, registeredPhone, bundleId }) {
+export async function createWhishPayment({ amount, registeredPhone }) {
   const response = await apiClient.post(appConfig.payment.endpoints.createWhish, {
-    amount,
+    amount: formatMoney(amount),
     currency: appConfig.payment.currency,
     user_phone: registeredPhone,
-    phone_number: registeredPhone,
-    bundle: bundleId || null,
-    source: appConfig.payment.promoSource,
   })
   const data = unwrapData(response)
   return data.payment_id || data.paymentId || data.id ? data : { id: data }
 }
 
-export async function getWhishPaymentLink(paymentId) {
-  const response = await apiClient.get(appConfig.payment.endpoints.whishLink(paymentId))
-  const data = unwrapData(response)
-  return data.payment_link || data.payment_url || data.url || data.link || `${appConfig.whishBaseUrl}/pay/whish?payment_id=${encodeURIComponent(paymentId)}`
-}
-
 export async function getPaymentStatus(paymentId) {
-  const response = await apiClient.get(appConfig.payment.endpoints.paymentDetails(paymentId))
-  return unwrapData(response)
+  const response = await apiClient.get(appConfig.payment.endpoints.paymentDetails(paymentId), {
+    params: { _t: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+    },
+  })
+  return listData(response)[0] || {}
 }
 
 export async function confirmPayment(paymentId) {
-  const response = await apiClient.patch(
-    `/items/payment/${encodeURIComponent(paymentId)}?fields=id,status,confirmed_at,validated_at,amount,amount_collected`,
-    { status: 'confirmed' },
-  )
+  const response = await apiClient.patch(appConfig.payment.endpoints.confirmPayment(paymentId), {
+    status: 'confirmed',
+  })
   return unwrapData(response)
 }
 
-export async function checkPromoCode(code) {
-  const response = await apiClient.post('/promocode/check/', { promocode: code.trim().toUpperCase() })
-  return unwrapData(response)
-}
-
-export async function consumePromoCode({ code, registeredPhone }) {
-  const cleaned = code.trim().toUpperCase()
-  const response = await apiClient.post(appConfig.payment.endpoints.promoConsume, {
-    code: cleaned,
-    promocode_id: cleaned,
-    promo_code: cleaned,
-    promocode: cleaned,
-    source: appConfig.payment.promoSource,
-    used_for: appConfig.payment.promoUsedFor,
+export async function checkPromoCode(code, registeredPhone) {
+  const response = await apiClient.post(appConfig.payment.endpoints.promoCheck, {
+    promocode: code.trim().toUpperCase(),
     user_phone: registeredPhone,
-    phone_number: registeredPhone,
+  })
+  return unwrapData(response)
+}
+
+export async function consumePromoCode(promoCodeId) {
+  const response = await apiClient.post(appConfig.payment.endpoints.promoConsume, {
+    promocode_id: promoCodeId,
   })
   return unwrapData(response)
 }
 
 export async function postDebugSmsWebhook({ carrier, amount, senderPhone }) {
+  const normalizedAmount = Number.parseFloat(Number(amount || 0).toFixed(2))
+  const formattedAmount = normalizedAmount.toFixed(1)
+  const reference = `debug-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   const response = await apiClient.post(
     appConfig.payment.endpoints.smsWebhook,
     {
       date_sms_received: new Date().toISOString(),
       mobile_operator: carrier.operator,
-      amount,
+      amount: normalizedAmount,
       phone_number: senderPhone,
-      raw_text: `Dear customer, $${Number(amount).toFixed(1)} were transferred to your balance from the mobile number ${senderPhone}.`,
-      reference: `${Date.now()}`,
+      raw_text: `Dear customer, $${formattedAmount} were transferred to your balance from the mobile number ${senderPhone}.`,
+      reference,
     },
     { headers: { Authorization: `Bearer ${appConfig.payment.smsWebhookToken}` } },
   )
@@ -100,5 +128,5 @@ export function isSuccessStatus(status) {
 }
 
 export function isFailedStatus(status) {
-  return ['failed', 'failure', 'declined', 'cancelled', 'canceled', 'expired'].includes(String(status || '').toLowerCase())
+  return ['failed', 'failure', 'declined', 'cancelled', 'canceled', 'rejected', 'expired', 'void'].includes(String(status || '').toLowerCase())
 }

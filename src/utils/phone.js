@@ -1,4 +1,5 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
+import { appConfig } from '@/config/appConfig'
 
 export function normalizePhone(raw, defaultCountry = 'LB') {
   const cleaned = String(raw || '').replace(/[^\d+]/g, '').slice(0, 18)
@@ -23,4 +24,15 @@ export function isLebanesePhone(e164) {
 
 export function digitsOnly(value) {
   return String(value || '').replace(/\D/g, '')
+}
+
+export function phoneLookupDigits(e164) {
+  const digits = digitsOnly(e164)
+  return digits.startsWith('961') ? digits.slice(3) : digits
+}
+
+export function carrierForPhone(e164) {
+  const candidates = [String(e164 || ''), digitsOnly(e164), phoneLookupDigits(e164)]
+  const carriers = Object.values(appConfig.payment.carriers)
+  return carriers.find((carrier) => candidates.some((candidate) => carrier.pattern?.test(candidate))) || null
 }

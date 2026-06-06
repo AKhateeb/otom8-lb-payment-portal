@@ -2,13 +2,16 @@
   <form class="space-y-5" @submit.prevent="submit">
     <div>
       <h2 class="text-2xl font-black">{{ store.t.phoneTitle }}</h2>
-      <p class="mt-2 text-sm leading-6 text-[#60706b]">{{ store.t.phoneSubtitle }}</p>
+      <p class="mt-2 text-sm leading-6 text-[#6B6756]">{{ store.t.phoneSubtitle }}</p>
     </div>
-    <PhoneInput v-model="phone" :label="store.t.phone" />
-    <div class="flex gap-3">
-      <AppButton variant="secondary" @click="store.setStep('welcome')">{{ store.t.back }}</AppButton>
-      <AppButton type="submit" class="flex-1">{{ store.t.continue }}</AppButton>
-    </div>
+    <PhoneInput
+      v-model="phone"
+      v-model:country="country"
+      :label="store.t.phone"
+      :placeholder="store.t.phonePlaceholder"
+      :search-placeholder="store.t.countrySearch"
+    />
+    <AppButton type="submit" class="w-full" :loading="store.loading">{{ store.t.continue }}</AppButton>
   </form>
 </template>
 
@@ -20,9 +23,10 @@ import { usePortalStore } from '@/stores/portalStore'
 
 const store = usePortalStore()
 const phone = ref(store.registeredPhone || '')
+const country = ref('LB')
 
-function submit() {
-  if (!store.validateRegisteredPhone(phone.value)) return
-  store.setStep('method')
+async function submit() {
+  if (!(await store.validateRegisteredPhone(phone.value, country.value))) return
+  store.nextAfterPhone()
 }
 </script>

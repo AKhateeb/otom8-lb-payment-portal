@@ -1,36 +1,81 @@
 <template>
   <label class="block">
-    <span class="mb-2 block text-sm font-semibold text-[#243332]">{{ label }}</span>
-    <div class="grid grid-cols-[108px_1fr] rounded-lg border border-[#d9e7dd] bg-white shadow-sm focus-within:border-[#21C063] focus-within:ring-4 focus-within:ring-[#21C063]/10">
-      <select v-model="country" class="rounded-l-lg border-0 bg-[#f4faf6] px-3 text-sm font-semibold text-[#243332] outline-none">
-        <option value="LB">LB +961</option>
-        <option value="AE">AE +971</option>
-        <option value="SA">SA +966</option>
-        <option value="US">US +1</option>
-        <option value="FR">FR +33</option>
-      </select>
-      <input
-        :value="modelValue"
-        inputmode="tel"
-        autocomplete="tel"
-        maxlength="18"
-        class="min-h-12 rounded-r-lg border-0 px-4 text-base text-[#182326] outline-none"
-        :placeholder="placeholder"
-        @input="$emit('update:modelValue', $event.target.value)"
-      />
-    </div>
+    <span class="mb-2 block text-sm font-semibold text-[#202020]">{{ label }}</span>
+    <VueTelInput
+      ref="phoneInputRef"
+      :model-value="modelValue"
+      :auto-default-country="false"
+      :default-country="country"
+      :dropdown-options="dropdownOptions"
+      :input-options="inputOptions"
+      :only-countries="lockCountry ? [country] : []"
+      :preferred-countries="lockCountry ? [country] : ['LB', 'AE', 'SA', 'QA', 'KW', 'US']"
+      :valid-characters-only="true"
+      mode="international"
+      dir="ltr"
+      style-classes="portal-phone-input"
+      @country-changed="countryChanged"
+      @update:model-value="$emit('update:modelValue', $event)"
+    />
   </label>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { VueTelInput } from 'vue-tel-input'
+import 'vue-tel-input/vue-tel-input.css'
 
-defineProps({
+const props = defineProps({
   label: { type: String, required: true },
   modelValue: { type: String, default: '' },
-  placeholder: { type: String, default: '+961 70 902 894' },
+  defaultCountry: { type: String, default: 'LB' },
+  searchPlaceholder: { type: String, default: 'Search country or code' },
+  placeholder: { type: String, default: 'Phone number' },
+  lockCountry: { type: Boolean, default: false },
 })
 
-defineEmits(['update:modelValue'])
-const country = ref('LB')
+const emit = defineEmits(['update:modelValue', 'update:country'])
+const country = ref(props.defaultCountry.toUpperCase())
+const phoneInputRef = ref(null)
+
+const dropdownOptions = computed(() => ({
+  showDialCodeInList: true,
+  showDialCodeInSelection: true,
+  showFlags: true,
+  showSearchBox: !props.lockCountry,
+  searchBoxPlaceholder: props.searchPlaceholder,
+  disabled: props.lockCountry,
+}))
+
+const inputOptions = computed(() => ({
+  autocomplete: 'tel',
+  inputmode: 'tel',
+  maxlength: 24,
+  placeholder: props.placeholder,
+  type: 'tel',
+}))
+
+watch(
+  () => props.defaultCountry,
+  (value) => {
+    if (value) country.value = value.toUpperCase()
+  },
+)
+
+function countryChanged(nextCountry) {
+  if (props.lockCountry) {
+    country.value = props.defaultCountry.toUpperCase()
+    return
+  }
+  const iso2 = nextCountry?.iso2?.toUpperCase()
+  if (!iso2) return
+  country.value = iso2
+  emit('update:country', iso2)
+}
+
+function focus() {
+  phoneInputRef.value?.$el?.querySelector('input[type="tel"]')?.focus()
+}
+
+defineExpose({ focus })
 </script>

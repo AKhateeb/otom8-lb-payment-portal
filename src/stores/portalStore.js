@@ -1,17 +1,22 @@
 import confetti from 'canvas-confetti'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { appConfig } from '@/config/appConfig'
 import { describeApiError } from '@/services/apiClient'
 import * as payments from '@/services/paymentService'
 import { dictionary, detectLanguage } from '@/utils/i18n'
-import { digitsOnly, isLebanesePhone, normalizePhone } from '@/utils/phone'
+import { carrierForPhone, digitsOnly, isLebanesePhone, normalizePhone } from '@/utils/phone'
 
-const fallbackBundles = [
-  { id: '3_1', amount: 3, credits: 1 },
-  { id: '9_3', amount: 9, credits: 3 },
-  { id: '18_6', amount: 18, credits: 6 },
-]
+function fallbackPlans(lang) {
+  const isArabic = lang === 'ar'
+  const name = isArabic ? 'الباقة الأساسية' : 'Basic Plan'
+  return [
+    { id: 'fallback_1', planId: 'fallback_1', name, renewInDays: 30, durationLabel: isArabic ? 'شهر واحد' : '1 month', months: 1, amount: 3, oldAmount: 6 },
+    { id: 'fallback_3', planId: 'fallback_3', name, renewInDays: 90, durationLabel: isArabic ? '3 أشهر' : '3 months', months: 3, amount: 7, oldAmount: 18 },
+    { id: 'fallback_6', planId: 'fallback_6', name, renewInDays: 180, durationLabel: isArabic ? '6 أشهر' : '6 months', months: 6, amount: 13, oldAmount: 18 },
+    { id: 'fallback_12', planId: 'fallback_12', name, renewInDays: 365, durationLabel: isArabic ? 'سنة واحدة' : '1 year', months: 12, amount: 24, oldAmount: 72 },
+  ]
+}
 
 const savedSession = () => {
   try {
@@ -32,57 +37,102 @@ export const usePortalStore = defineStore('portal', () => {
   const currentStep = ref(session.value.currentStep || 'welcome')
   const registeredPhone = ref(session.value.registeredPhone || '')
   const senderPhone = ref(session.value.senderPhone || '')
-  const useSamePhone = ref(true)
+  const useSamePhone = ref(Boolean(registeredPhone.value && isLebanesePhone(registeredPhone.value)))
   const selectedMethod = ref(null)
-  const selectedBundle = ref(null)
+  const selectedPlan = ref(null)
   const promoCode = ref('')
-  const bundles = ref([])
+  const plans = ref([])
+  const plansLanguage = ref('')
   const payment = ref(null)
+  const paymentStarted = ref(false)
+  const leavingForPayment = ref(false)
+  const smsUnitsSent = ref(0)
+  const smsLastCollected = ref(0)
+  const smsCheckResult = ref('')
+  const smsAwaitingConfirmation = ref(false)
   const loading = ref(false)
   const loadingMessage = ref('')
+  const loadingAction = ref('')
   const error = ref('')
   const debugEvents = ref([])
   const success = ref(false)
 
-  const hasDirtyInput = computed(() => Boolean(registeredPhone.value || selectedMethod.value || selectedBundle.value || promoCode.value))
   const isRtl = computed(() => lang.value === 'ar')
   const t = computed(() => dictionary[lang.value] || dictionary.en)
+  const selectedAmount = computed(() => Number(selectedPlan.value?.amount || 0))
+  const selectedMonths = computed(() => Number(selectedPlan.value?.months || 0))
+  const selectedCarrier = computed(() => carrierForPhone(senderPhone.value))
+  const needsPlan = computed(() => ['whish', 'sms'].includes(selectedMethod.value?.type))
+  const needsSenderPhone = computed(() => selectedMethod.value?.type === 'sms')
+  const smsRemaining = computed(() => Math.max(0, selectedAmount.value - smsLastCollected.value))
+  const nextSmsChunk = computed(() => Math.min(3, smsRemaining.value || selectedAmount.value || 3))
+  const canSendMoreSms = computed(() => selectedMethod.value?.type === 'sms' && smsRemaining.value > 0)
+  const hasDirtyInput = computed(() => Boolean(registeredPhone.value || selectedMethod.value || selectedPlan.value || promoCode.value || payment.value))
 
-  const steps = ['welcome', 'phone', 'method', 'bundle', 'details', 'summary', 'success']
-  const progress = computed(() => Math.max(6, ((steps.indexOf(currentStep.value) + 1) / steps.length) * 100))
+  const activeSteps = computed(() => {
+    const base = ['welcome', 'method', 'phone']
+    if (needsPlan.value) base.push('plan')
+    if (needsSenderPhone.value) base.push('details')
+    if (appConfig.showSummaryStep) base.push('summary')
+    base.push('payment', 'success')
+    return base
+  })
 
-  const methods = computed(() => [
-    {
-      id: 'whish',
-      type: 'whish',
-      title: lang.value === 'ar' ? 'Whish' : 'Whish Pay',
-      subtitle: lang.value === 'ar' ? 'افتح صفحة Whish وأكمل الدفع بالـ OTP.' : 'Open Whish and complete payment with OTP.',
-      icon: '/assets/payment/whish.webp',
-    },
-    {
-      id: 'alfa',
-      type: 'sms',
-      carrier: appConfig.payment.carriers.alfa,
-      title: appConfig.payment.carriers.alfa[lang.value === 'ar' ? 'titleAr' : 'title'],
-      subtitle: lang.value === 'ar' ? 'افتح الرسائل وأرسل رصيد ألفا.' : 'Open SMS and send Alfa credit.',
-      icon: '/assets/payment/alfa.webp',
-    },
-    {
-      id: 'touch',
-      type: 'sms',
-      carrier: appConfig.payment.carriers.touch,
-      title: appConfig.payment.carriers.touch[lang.value === 'ar' ? 'titleAr' : 'title'],
-      subtitle: lang.value === 'ar' ? 'افتح الرسائل وأرسل وحدات تاتش.' : 'Open SMS and send Touch units.',
-      icon: '/assets/payment/touch.webp',
-    },
-    {
+  const progress = computed(() => {
+    const index = activeSteps.value.indexOf(currentStep.value)
+    return Math.max(6, (((index < 0 ? 0 : index) + 1) / activeSteps.value.length) * 100)
+  })
+
+  const progressHint = computed(() => {
+    const hints = t.value.progressHints || {}
+    return hints[currentStep.value] || hints.default || ''
+  })
+
+  const methods = computed(() => {
+    const items = [
+      {
+        id: 'whish-pay',
+        type: 'whish',
+        title: 'Whish Pay',
+        subtitle: lang.value === 'ar' ? 'ادفع بأمان عبر Whish.' : 'Pay securely with Whish.',
+        icon: '/assets/payment/whish.png',
+      },
+    ]
+
+    if (appConfig.enableCarrierDetection) {
+      items.push({
+        id: 'sms-units',
+        type: 'sms',
+        title: lang.value === 'ar' ? 'وحدات الهاتف' : 'Phone units',
+        subtitle: lang.value === 'ar' ? 'أرسل وحدات من خط Alfa أو Touch.' : 'Send units from an Alfa or Touch line.',
+        icons: [
+          appConfig.payment.carriers.alfa.icon,
+          appConfig.payment.carriers.touch.icon,
+        ],
+      })
+    } else {
+      Object.values(appConfig.payment.carriers).forEach((carrier) => {
+        items.push({
+          id: carrier.id,
+          type: 'sms',
+          carrier,
+          title: carrier[lang.value === 'ar' ? 'titleAr' : 'title'],
+          subtitle: lang.value === 'ar' ? 'أرسل الوحدات برسالة جاهزة.' : 'Send units with a prepared SMS.',
+          icon: carrier.icon,
+        })
+      })
+    }
+
+    items.push({
       id: 'promocode',
       type: 'promo',
       title: lang.value === 'ar' ? 'كود تفعيل' : 'Activation code',
-      subtitle: lang.value === 'ar' ? 'أدخل الكود ثم فعّل الحساب.' : 'Enter the code and activate the account.',
-      icon: '/assets/payment/coupon.webp',
-    },
-  ])
+      subtitle: lang.value === 'ar' ? 'أدخل الكود ونفعل الاشتراك.' : 'Enter the code and we activate the subscription.',
+      icon: '/assets/payment/coupon.png',
+    })
+
+    return items
+  })
 
   function persist() {
     sessionStorage.setItem(
@@ -90,6 +140,7 @@ export const usePortalStore = defineStore('portal', () => {
       JSON.stringify({
         currentStep: currentStep.value,
         registeredPhone: registeredPhone.value,
+        senderPhone: senderPhone.value,
       }),
     )
   }
@@ -103,18 +154,31 @@ export const usePortalStore = defineStore('portal', () => {
       detail,
     }
     debugEvents.value.unshift(entry)
-    debugEvents.value = debugEvents.value.slice(0, 8)
+    debugEvents.value = debugEvents.value.slice(0, 12)
     console.info(`[PaymentPortal] ${label}`, detail)
   }
 
-  function setLoading(value, message = '') {
+  function setLoading(value, message = '', action = '') {
     loading.value = value
     loadingMessage.value = value ? message : ''
+    loadingAction.value = value ? action : ''
   }
 
   function setStep(step) {
     currentStep.value = step
     persist()
+  }
+
+  function resetPaymentState() {
+    selectedPlan.value = null
+    promoCode.value = ''
+    payment.value = null
+    paymentStarted.value = false
+    leavingForPayment.value = false
+    smsUnitsSent.value = 0
+    smsLastCollected.value = 0
+    smsCheckResult.value = ''
+    smsAwaitingConfirmation.value = false
   }
 
   function setApiError(label, apiError, fallbackMessage = t.value.friendlyError) {
@@ -124,121 +188,263 @@ export const usePortalStore = defineStore('portal', () => {
       error.value = t.value.statusForbidden
       return
     }
-    error.value = `${fallbackMessage}${appConfig.isDebug && details.status ? ` (${details.status}: ${details.backendMessage})` : ''}`
+    error.value = `${fallbackMessage}${appConfig.isDebug && (details.status || details.backendMessage) ? ` (${details.status || 'local'}: ${details.backendMessage})` : ''}`
   }
 
-  function validateRegisteredPhone(input) {
-    const normalized = normalizePhone(input)
+  function selectMethod(method) {
+    selectedMethod.value = method
+    resetPaymentState()
+    error.value = ''
+    setStep('phone')
+  }
+
+  async function validateRegisteredPhone(input, country = 'LB') {
+    const normalized = normalizePhone(input, country)
     if (!normalized.valid) {
       error.value = t.value.invalidPhone
       return false
     }
+
+    error.value = ''
     registeredPhone.value = normalized.e164
-    if (useSamePhone.value) senderPhone.value = normalized.e164
+    useSamePhone.value = isLebanesePhone(normalized.e164)
+    senderPhone.value = useSamePhone.value ? normalized.e164 : ''
+    pushDebug('phone.validated', { phone: normalized.e164, country: normalized.country })
+    persist()
+    return true
+  }
+
+  function validateSenderPhone(input, country = 'LB') {
+    const normalized = normalizePhone(input, country)
+    if (!normalized.valid) {
+      error.value = t.value.invalidPhone
+      return false
+    }
+    if (selectedMethod.value?.type === 'sms') {
+      const detectedCarrier = carrierForPhone(normalized.e164)
+      if (!isLebanesePhone(normalized.e164) || (appConfig.enableCarrierDetection && !detectedCarrier)) {
+        error.value = t.value.lebaneseOnly
+        return false
+      }
+      if (appConfig.enableCarrierDetection) {
+        selectedMethod.value = {
+          ...selectedMethod.value,
+          id: detectedCarrier.id,
+          carrier: detectedCarrier,
+          title: detectedCarrier[lang.value === 'ar' ? 'titleAr' : 'title'],
+          icon: detectedCarrier.icon,
+        }
+      }
+    }
+    senderPhone.value = normalized.e164
     error.value = ''
     persist()
     return true
   }
 
-  function validateSenderPhone(input) {
-    const normalized = normalizePhone(input)
-    if (!normalized.valid) {
-      error.value = t.value.invalidPhone
-      return false
-    }
-    if (selectedMethod.value?.type === 'sms' && !isLebanesePhone(normalized.e164) && !appConfig.isDebug) {
-      error.value = t.value.lebaneseOnly
-      return false
-    }
-    senderPhone.value = normalized.e164
+  async function loadPlans(force = false) {
+    if (!force && plans.value.length && plansLanguage.value === lang.value) return
+    setLoading(true, t.value.loadingPlans, 'loadPlans')
     error.value = ''
-    return true
-  }
-
-  async function loadBundles() {
-    if (bundles.value.length) return
-    setLoading(true, t.value.loadingBundles)
-    error.value = ''
+    const selectedPlanId = selectedPlan.value?.planId
     try {
-      bundles.value = await payments.getBundles()
-      pushDebug('bundles.loaded', { count: bundles.value.length })
-      if (!bundles.value.length) bundles.value = fallbackBundles
+      const rows = await payments.getPlans(lang.value)
+      const defaults = fallbackPlans(lang.value)
+      plans.value = rows.length ? rows : defaults
+      plansLanguage.value = lang.value
+      selectedPlan.value = plans.value.find((plan) => plan.planId === selectedPlanId) || plans.value[0]
+      pushDebug('plans.loaded', { count: plans.value.length, plans: plans.value })
     } catch (apiError) {
-      bundles.value = fallbackBundles
-      setApiError('bundles.failed_using_fallback', apiError, 'Could not read backend bundles. Showing default Smart Ads amounts.')
+      const defaults = fallbackPlans(lang.value)
+      plans.value = defaults
+      plansLanguage.value = lang.value
+      selectedPlan.value = defaults.find((plan) => plan.planId === selectedPlanId) || defaults[0]
+      setApiError('plans.failed_using_fallback', apiError, t.value.plansFallbackError)
     } finally {
       setLoading(false)
     }
   }
 
-  async function submitSummary() {
-    error.value = ''
-    if (selectedMethod.value.type === 'promo') {
-      await submitPromo()
+  function nextAfterPhone() {
+    if (selectedMethod.value?.type === 'promo') {
+      setStep('payment')
       return
     }
-    if (selectedMethod.value.type === 'whish') {
-      await submitWhish()
+    loadPlans()
+    setStep('plan')
+  }
+
+  function nextAfterPlan() {
+    if (needsSenderPhone.value) {
+      setStep('details')
       return
     }
-    await submitSmsUnits()
+    if (appConfig.showSummaryStep) {
+      setStep('summary')
+      return
+    }
+    setStep('payment')
+  }
+
+  function nextAfterDetails() {
+    if (appConfig.showSummaryStep) {
+      setStep('summary')
+      return
+    }
+    setStep('payment')
+  }
+
+  function goToPayment() {
+    setStep('payment')
   }
 
   async function submitPromo() {
-    setLoading(true, t.value.creatingPayment)
+    setLoading(true, t.value.creatingPayment, 'promo')
     try {
-      await payments.consumePromoCode({ code: promoCode.value, registeredPhone: registeredPhone.value })
-      completeSuccess()
-    } catch (apiError) {
-      setApiError('promo.consume.failed', apiError, t.value.codeInvalid)
+      let checked
+      try {
+        checked = await payments.checkPromoCode(promoCode.value, registeredPhone.value)
+        pushDebug('promo.check.success', checked)
+      } catch (apiError) {
+        setApiError('promo.check.failed', apiError, t.value.codeInvalid)
+        return
+      }
+
+      const promoCodeId =
+        checked.id ||
+        checked.promocode_id ||
+        checked.promocodeId ||
+        checked.promocode?.id ||
+        checked.data?.id
+      if (!promoCodeId) throw new Error('Promocode check did not return an id')
+
+      try {
+        const result = await payments.consumePromoCode(promoCodeId)
+        pushDebug('promo.consume.success', result)
+        completeSuccess()
+      } catch (apiError) {
+        setApiError('promo.consume.failed', apiError, t.value.codeInvalid)
+      }
+    } catch (error) {
+      pushDebug('promo.response.invalid', { message: error.message, checked })
+      error.value = t.value.codeInvalid
     } finally {
+      if (!success.value) paymentStarted.value = false
       setLoading(false)
+    }
+  }
+
+  async function startPayment() {
+    if (paymentStarted.value) return
+    paymentStarted.value = true
+    error.value = ''
+
+    if (selectedMethod.value?.type === 'promo') {
+      await submitPromo()
+      return
+    }
+    if (!selectedPlan.value) {
+      error.value = t.value.planTitle
+      paymentStarted.value = false
+      return
+    }
+    if (selectedMethod.value?.type === 'whish') {
+      await submitWhish()
+      return
+    }
+    if (selectedMethod.value?.type === 'sms') {
+      await sendNextSms()
     }
   }
 
   async function submitWhish() {
-    setLoading(true, t.value.openingWhish)
+    setLoading(true, t.value.waitingWhishLink, 'whish')
     try {
-      const amount = Number(selectedBundle.value?.amount || appConfig.payment.monthlyPrice)
-      const draft = await payments.createWhishPayment({ amount, registeredPhone: registeredPhone.value, bundleId: selectedBundle.value?.id })
+      const draft = await payments.createWhishPayment({
+        amount: selectedAmount.value,
+        registeredPhone: registeredPhone.value,
+      })
       const paymentId = draft.payment_id || draft.paymentId || draft.id
       if (!paymentId) throw new Error('Whish did not return payment_id')
 
-      const link = draft.payment_link || draft.payment_url || (await payments.getWhishPaymentLink(paymentId))
-      payment.value = { id: paymentId, status: 'pending', link }
-      pushDebug('whish.created', { paymentId, link })
-      if (link) window.open(link, '_blank', 'noopener,noreferrer')
-      setStep('details')
-      pollPayment(paymentId)
+      payment.value = { id: paymentId, status: 'pending' }
+      pushDebug('whish.created', { paymentId })
+      const link = draft.payment_link
+      if (!link) {
+        error.value = t.value.whishLinkNotReady
+        paymentStarted.value = false
+        return
+      }
+      payment.value = { ...payment.value, link, whishLinkReady: true }
+      persist()
+      leavingForPayment.value = true
+      window.location.assign(link)
     } catch (apiError) {
-      setApiError('whish.create.failed', apiError, 'Could not create the Whish payment.')
+      paymentStarted.value = false
+      setApiError('whish.create.failed', apiError, t.value.whishCreateError)
     } finally {
       setLoading(false)
     }
   }
 
-  async function submitSmsUnits() {
-    setLoading(true, t.value.creatingPayment)
+  async function sendNextSms() {
+    if (!selectedMethod.value?.carrier) {
+      error.value = t.value.lebaneseOnly
+      paymentStarted.value = false
+      return
+    }
+    if (smsRemaining.value <= 0 && payment.value?.id) {
+      error.value = t.value.allUnitsSent
+      await checkCurrentPayment()
+      return
+    }
+
+    setLoading(true, t.value.creatingPayment, 'sendSms')
+    error.value = ''
     try {
-      const amount = Number(selectedBundle.value?.amount || appConfig.payment.monthlyPrice)
-      const draft = await payments.createDraftPayment({
-        amount,
-        method: selectedMethod.value.carrier.method,
-        registeredPhone: registeredPhone.value,
-        senderPhone: senderPhone.value,
-        bundleId: selectedBundle.value?.id,
-      })
+      if (!(await prepareSmsPayment())) return
+
+      const chunk = Math.min(3, smsRemaining.value || selectedAmount.value)
       const href = buildSmsHref({
         shortCode: selectedMethod.value.carrier.shortCode,
         receiver: selectedMethod.value.carrier.receiver,
-        amount,
+        amount: chunk,
       })
-      payment.value = { ...draft, id: draft.id, smsHref: href, status: draft.status || 'draft' }
-      pushDebug('sms.draft.created', { paymentId: draft.id, smsHref: href })
-      setStep('details')
+      payment.value = { ...payment.value, smsHref: href, lastChunk: chunk }
+      smsUnitsSent.value = Math.min(selectedAmount.value, smsUnitsSent.value + chunk)
+      pushDebug('sms.open', { paymentId: payment.value.id, href, chunk, sent: smsUnitsSent.value, remaining: smsRemaining.value })
       window.location.href = href
+      pollPayment(payment.value.id, 'sms')
     } catch (apiError) {
-      setApiError('sms.draft.failed', apiError, 'Could not create the SMS payment request.')
+      paymentStarted.value = false
+      setApiError('sms.draft.failed', apiError, t.value.smsCreateError)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function prepareSmsPayment() {
+    if (payment.value?.id) return true
+    if (!selectedMethod.value?.carrier) {
+      error.value = t.value.lebaneseOnly
+      return false
+    }
+    setLoading(true, t.value.creatingPayment, 'prepareSms')
+    error.value = ''
+    try {
+      const draft = await payments.createDraftPayment({
+        amount: selectedAmount.value,
+        method: selectedMethod.value.carrier.method,
+        registeredPhone: registeredPhone.value,
+        senderPhone: senderPhone.value || registeredPhone.value,
+      })
+      payment.value = { ...draft, id: draft.id, status: draft.status || 'draft' }
+      pushDebug('sms.draft.created', { draft, selectedAmount: selectedAmount.value })
+      return Boolean(payment.value.id)
+    } catch (apiError) {
+      paymentStarted.value = false
+      setApiError('sms.draft.failed', apiError, t.value.smsCreateError)
+      return false
     } finally {
       setLoading(false)
     }
@@ -252,19 +458,102 @@ export const usePortalStore = defineStore('portal', () => {
 
   async function sendSmsDebugWebhook() {
     if (!appConfig.debugSmsWebhookEnabled || !selectedMethod.value?.carrier) return
-    setLoading(true, 'Sending debug SMS webhook...')
+    setLoading(true, t.value.debugSending, 'debugWebhook')
+    error.value = ''
     try {
-      await payments.postDebugSmsWebhook({
+      const latestBeforeWebhook = await payments.getPaymentStatus(payment.value.id)
+      updatePaymentFromStatus(latestBeforeWebhook)
+
+      if (payments.isSuccessStatus(latestBeforeWebhook.status)) {
+        smsAwaitingConfirmation.value = false
+        completeSuccess()
+        return
+      }
+
+      if (smsRemaining.value <= 0) {
+        smsAwaitingConfirmation.value = true
+        void waitForSmsWebhookUpdate({
+          sentAmount: 0,
+          expectedCollected: selectedAmount.value,
+        })
+        return
+      }
+
+      const amount = Number(Math.min(3, smsRemaining.value).toFixed(2))
+      const collectedBeforeWebhook = smsLastCollected.value
+      const result = await payments.postDebugSmsWebhook({
         carrier: selectedMethod.value.carrier,
-        amount: Number(selectedBundle.value?.amount || appConfig.payment.monthlyPrice),
+        amount,
         senderPhone: senderPhone.value,
       })
-      pushDebug('sms.webhook.sent', { senderPhone: senderPhone.value })
+      if (result?.success === false || result?.parsed === false) {
+        throw new Error('Debug SMS webhook was not accepted')
+      }
+      pushDebug('sms.webhook.sent', {
+        senderPhone: senderPhone.value,
+        amount,
+        remainingBeforeWebhook: smsRemaining.value,
+        result,
+      })
+
+      const expectedCollected = Math.min(selectedAmount.value, collectedBeforeWebhook + amount)
+      smsLastCollected.value = expectedCollected
+      smsUnitsSent.value = Math.max(smsUnitsSent.value, expectedCollected)
+      smsCheckResult.value = expectedCollected < selectedAmount.value ? 'partial' : ''
+      smsAwaitingConfirmation.value = expectedCollected >= selectedAmount.value
+
+      void waitForSmsWebhookUpdate({ sentAmount: amount, expectedCollected })
+      if (expectedCollected >= selectedAmount.value) {
+        completeSuccess()
+      }
     } catch (apiError) {
-      setApiError('sms.webhook.failed', apiError, 'Debug webhook failed.')
+      setApiError('sms.webhook.failed', apiError, t.value.debugFailed)
     } finally {
       setLoading(false)
     }
+  }
+
+  async function waitForSmsWebhookUpdate({ sentAmount, expectedCollected }) {
+    for (let attempt = 1; attempt <= 15; attempt += 1) {
+      if (attempt > 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000))
+      }
+
+      try {
+        const latest = await payments.getPaymentStatus(payment.value.id)
+        const backendCollected = Number(latest.amount_collected || 0)
+        updatePaymentFromStatus(latest)
+        pushDebug('sms.webhook.status', { attempt, sentAmount, latest })
+
+        if (payments.isSuccessStatus(latest.status)) {
+          smsAwaitingConfirmation.value = false
+          await payments.confirmPayment(payment.value.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
+          completeSuccess()
+          return
+        }
+
+        if (expectedCollected < selectedAmount.value && backendCollected >= expectedCollected) {
+          smsCheckResult.value = smsRemaining.value > 0 ? 'partial' : ''
+          return
+        }
+      } catch (apiError) {
+        pushDebug('sms.webhook.status.failed', { attempt, ...describeApiError(apiError) })
+      }
+    }
+
+    smsCheckResult.value = smsLastCollected.value > 0 ? 'partial' : 'pending'
+    smsAwaitingConfirmation.value = smsRemaining.value <= 0
+  }
+
+  function updatePaymentFromStatus(latest) {
+    payment.value = { ...payment.value, ...latest }
+    const collected = Number(latest.amount_collected || 0)
+    const boundedCollected = Math.max(0, Math.min(selectedAmount.value || collected, collected))
+    smsLastCollected.value =
+      selectedMethod.value?.type === 'sms'
+        ? Math.max(smsLastCollected.value, boundedCollected)
+        : boundedCollected
+    smsUnitsSent.value = Math.max(smsUnitsSent.value, smsLastCollected.value)
   }
 
   async function checkCurrentPayment() {
@@ -272,18 +561,29 @@ export const usePortalStore = defineStore('portal', () => {
       error.value = t.value.paymentPending
       return
     }
-    setLoading(true, t.value.checkingPayment)
+    error.value = ''
+    smsCheckResult.value = ''
+    setLoading(true, t.value.checkingPayment, 'checkPayment')
     try {
       const latest = await payments.getPaymentStatus(payment.value.id)
-      payment.value = { ...payment.value, ...latest }
+      updatePaymentFromStatus(latest)
       pushDebug('payment.status', latest)
       if (payments.isSuccessStatus(latest.status)) {
-        await payments.confirmPayment(latest.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
+        await payments.confirmPayment(payment.value.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
         completeSuccess()
       } else if (payments.isFailedStatus(latest.status)) {
         error.value = t.value.friendlyError
       } else {
-        error.value = t.value.paymentPending
+        if (selectedMethod.value?.type === 'sms') {
+          smsAwaitingConfirmation.value = smsRemaining.value <= 0
+          smsCheckResult.value = smsAwaitingConfirmation.value
+            ? ''
+            : smsLastCollected.value > 0
+              ? 'partial'
+              : 'pending'
+        } else {
+          error.value = t.value.paymentPending
+        }
       }
     } catch (apiError) {
       setApiError('payment.status.failed', apiError, t.value.paymentPending)
@@ -292,34 +592,40 @@ export const usePortalStore = defineStore('portal', () => {
     }
   }
 
-  function pollPayment(paymentId) {
+  function pollPayment(paymentId, source) {
     if (!paymentId) return
     let count = 0
+    const maxPolls = source === 'whish' ? appConfig.payment.maxWhishPolls : Math.ceil(appConfig.payment.whishVerifyTimeoutMs / appConfig.payment.statusPollMs)
+    const intervalMs = source === 'whish' ? appConfig.payment.whishVerifyPollMs : appConfig.payment.statusPollMs
     const timer = window.setInterval(async () => {
       count += 1
       try {
         const latest = await payments.getPaymentStatus(paymentId)
-        payment.value = { ...payment.value, ...latest }
+        updatePaymentFromStatus(latest)
+        pushDebug(`${source}.poll.status`, latest)
         if (payments.isSuccessStatus(latest.status)) {
           window.clearInterval(timer)
-          await payments.confirmPayment(latest.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
+          await payments.confirmPayment(paymentId).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
           completeSuccess()
         }
-        if (payments.isFailedStatus(latest.status) || count > appConfig.payment.maxWhishPolls) {
+        if (payments.isFailedStatus(latest.status) || count > maxPolls) {
           window.clearInterval(timer)
         }
       } catch (apiError) {
-        pushDebug('payment.poll.failed', describeApiError(apiError))
-        if (count > appConfig.payment.maxWhishPolls) window.clearInterval(timer)
+        pushDebug(`${source}.poll.failed`, describeApiError(apiError))
+        if (count > maxPolls) window.clearInterval(timer)
       }
-    }, appConfig.payment.whishPollMs)
+    }, intervalMs)
   }
 
   function completeSuccess() {
+    if (success.value) return
     success.value = true
     setStep('success')
     sessionStorage.removeItem('payment_portal_session')
-    confetti({ particleCount: 140, spread: 78, origin: { y: 0.62 } })
+    confetti({ particleCount: 220, spread: 110, startVelocity: 42, origin: { y: 0.65 } })
+    window.setTimeout(() => confetti({ particleCount: 160, spread: 90, origin: { x: 0.15, y: 0.55 } }), 280)
+    window.setTimeout(() => confetti({ particleCount: 160, spread: 90, origin: { x: 0.85, y: 0.55 } }), 520)
   }
 
   function reset() {
@@ -327,14 +633,26 @@ export const usePortalStore = defineStore('portal', () => {
     currentStep.value = 'welcome'
     registeredPhone.value = ''
     senderPhone.value = ''
+    useSamePhone.value = false
     selectedMethod.value = null
-    selectedBundle.value = null
+    selectedPlan.value = null
+    plansLanguage.value = ''
     promoCode.value = ''
     payment.value = null
+    paymentStarted.value = false
+    leavingForPayment.value = false
+    smsUnitsSent.value = 0
+    smsLastCollected.value = 0
+    smsCheckResult.value = ''
+    smsAwaitingConfirmation.value = false
     error.value = ''
     debugEvents.value = []
     success.value = false
   }
+
+  watch(lang, () => {
+    if (currentStep.value === 'plan' && plans.value.length) loadPlans(true)
+  })
 
   return {
     lang,
@@ -342,26 +660,49 @@ export const usePortalStore = defineStore('portal', () => {
     t,
     currentStep,
     progress,
+    progressHint,
     registeredPhone,
     senderPhone,
     useSamePhone,
     selectedMethod,
-    selectedBundle,
+    selectedPlan,
     promoCode,
-    bundles,
+    plans,
     methods,
     payment,
+    paymentStarted,
+    leavingForPayment,
+    smsUnitsSent,
+    smsLastCollected,
+    smsCheckResult,
+    smsAwaitingConfirmation,
+    smsRemaining,
+    nextSmsChunk,
+    canSendMoreSms,
+    selectedAmount,
+    selectedMonths,
     loading,
     loadingMessage,
+    loadingAction,
     error,
     debugEvents,
     success,
     hasDirtyInput,
+    selectedCarrier,
+    needsPlan,
+    needsSenderPhone,
     setStep,
+    selectMethod,
     validateRegisteredPhone,
     validateSenderPhone,
-    loadBundles,
-    submitSummary,
+    loadPlans,
+    nextAfterPhone,
+    nextAfterPlan,
+    nextAfterDetails,
+    goToPayment,
+    startPayment,
+    prepareSmsPayment,
+    sendNextSms,
     openSmsAppAgain,
     sendSmsDebugWebhook,
     checkCurrentPayment,

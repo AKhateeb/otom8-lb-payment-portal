@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This portal is a focused client-side payment flow intended to be deployed on Firebase Hosting, usually under `pay.smartads-lb.com`. It collects enough information to associate a payment with a Smart Ads user phone and then delegates validation to the backend payment endpoints.
+This portal is a focused Ejet Elkahraba subscription payment flow. It collects the user account phone, reads the current plan table, and delegates account and payment validation to the Ejet backend.
 
 ## Stack
 
@@ -13,69 +13,66 @@ This portal is a focused client-side payment flow intended to be deployed on Fir
 - Axios
 - Tailwind CSS v4
 - Firebase Hosting
-- `libphonenumber-js` for international phone parsing
-- `canvas-confetti` for the success state
+- `libphonenumber-js`
+- `canvas-confetti`
 
 ## Main Files
 
-- `src/config/appConfig.js`: single source for app identity, colors, backend URLs, token, debug flags, SMS carrier config, and Firebase values.
-- `src/stores/portalStore.js`: wizard state, validation, payment orchestration, polling, success handling, and session persistence.
-- `src/services/paymentService.js`: Directus/Ejet-compatible payment API calls.
-- `src/views/PortalView.vue`: shell layout, progress, language direction, and route-level unsaved-data warning.
+- `src/config/appConfig.js`: app identity, colors, backend URLs, token, plan/payment endpoints, carrier config, Firebase values.
+- `src/stores/portalStore.js`: wizard state, phone validation, plan loading, payment orchestration, polling, success handling.
+- `src/services/paymentService.js`: Directus/Ejet-compatible API calls.
+- `src/views/PortalView.vue`: shell layout, progress, loading/error states, debug log.
 - `src/views/steps/*`: focused wizard steps.
 
 ## Auth Model
 
-There is no OTP login in this portal. The portal uses a configured backend token for payment operations and sends the user-entered registered phone as payload metadata:
+There is no OTP auth in the portal. The configured shared token is used for payment operations. The frontend never queries `/users` by phone; it sends the account phone to `/pay` and relies on that endpoint to accept or reject the request without exposing a separate account-existence check.
 
-- `user_phone`
-- `phone_number`
-- `sender_phone` for SMS unit transfers
+Important: Vite exposes all `VITE_*` values in the built bundle. The backend token must remain tightly scoped.
 
-The route guard prevents direct wizard access without a captured phone in session state, but it is not user authentication.
+## Plans
 
-Important: in a Vite CSR app, `VITE_*` values are visible to browser users. The payment token must be limited server-side to only the actions this portal needs.
+The app reads `/items/plan?fields=id,current_value,previous_value,tr.name`. There are no credits or bundles in Ejet. The UI displays subscription periods based on the current plan value and Ejet month options.
 
 ## Payment Methods
 
-Cash agents are intentionally excluded.
+Cash is intentionally excluded.
+
+Wizard order:
+
+1. Welcome and free-trial/subscription message.
+2. Payment method selection.
+3. Account phone resolution.
+4. Plan selection for Whish and SMS units.
+5. Payment phone for SMS units only; Whish collects the payer phone inside its gateway.
+6. Optional summary controlled by `VITE_SHOW_PAYMENT_SUMMARY`.
+7. Payment execution.
+8. Success with `ejet://powerline` CTA.
 
 Whish:
 
-1. Create Whish payment through `POST /pay/whish`.
-2. Resolve hosted link from response or payment record.
-3. Open link in a new tab.
-4. Poll `/items/payment/:id`.
-5. On success, patch payment status to confirmed and show success.
+1. Show the inline Whish phone/OTP guide, with Next and Skip controls.
+2. Create the payment through `POST /pay/whish` after the user finishes or skips the guide.
+3. Read `payment_id` and `payment_link` from the create response.
+4. Navigate the current page directly to `payment_link`; Whish sends `X-Frame-Options: SAMEORIGIN` and cannot be embedded cross-domain.
+5. Let the Whish gateway own the payment fields, CTAs, and completion screens.
 
 SMS units:
 
-1. Validate registered and sender phones.
-2. Production requires Lebanese sender numbers.
-3. Create draft payment in `/items/payment`.
-4. Show SMS shortcode/message instructions.
-5. Allow manual payment checks through `/items/payment/:id`.
-6. Debug mode can call `/sms-gateway/webhook` with the provided token.
+1. Detect Alfa/Touch from the account phone when `VITE_ENABLE_CARRIER_DETECTION=true`.
+2. Create a draft payment with `{ method, amount, user_phone }` when the payment screen opens.
+3. On mobile, show one large Send Units button that opens the native SMS app with a `$3` chunk or the remaining amount.
+4. On desktop, show the carrier SMS shortcode and exact message body in a clear two-step instruction card.
+5. Show one I sent the units action to check backend progress on both mobile and desktop.
+6. Keep the debug SMS webhook in the debug diagnostics panel, outside the production payment widget.
+7. Show success after backend validation.
 
 Promo code:
 
-1. Capture and sanitize code.
-2. Consume through `/promocode/consume/`.
+1. Check the code through `/promocode/check/`.
+2. Consume with `{ promocode_id }`.
 3. Show success when the backend accepts it.
 
-## Error Handling
+## Debugging
 
-The Axios layer maps raw backend status codes such as 400, 401, 403, 404, 500, 502, and 503 into friendly UI messages. Step-level validation shows clear inline alerts in the portal card.
-
-## Localization
-
-The app detects `navigator.language`. Arabic browsers get Arabic and RTL direction; all other browser languages fall back to English. Users can toggle EN/AR manually from the header.
-
-## Deployment
-
-Firebase Hosting serves `dist` and rewrites all routes to `index.html`.
-
-```bash
-npm run build
-firebase deploy
-```
+Debug mode shows API request/response details in the UI and can call `/sms-gateway/webhook` when `VITE_ENABLE_DEBUG_SMS_WEBHOOK=true`.

@@ -1,38 +1,35 @@
 <template>
   <div class="space-y-5">
     <div>
-      <h2 class="text-2xl font-black">{{ store.t.bundleTitle }}</h2>
-      <p class="mt-2 text-sm text-[#60706b]">{{ store.t.loadingBundles }}</p>
+      <h2 class="text-2xl font-black">{{ store.t.planTitle }}</h2>
+      <p class="mt-2 text-sm leading-6 text-[#6B6756]">{{ store.t.planSubtitle }}</p>
     </div>
-    <div v-if="store.loading" class="grid min-h-40 place-items-center rounded-lg bg-[#f7fcf8]">
-      <LoaderCircle class="h-8 w-8 animate-spin text-[#21C063]" />
+    <div v-if="store.loading" class="grid min-h-40 place-items-center rounded-lg bg-[#FFF8D7]">
+      <LoaderCircle class="h-8 w-8 animate-spin text-[#202020]" />
     </div>
-    <div v-else class="grid gap-3 sm:grid-cols-3">
+    <div v-else class="grid gap-3 sm:grid-cols-2">
       <button
-        v-for="bundle in visibleBundles"
-        :key="bundle.id"
-        class="rounded-lg border p-4 text-start transition hover:border-[#21C063]"
-        :class="store.selectedBundle?.id === bundle.id ? 'border-[#21C063] bg-[#eff8f1]' : 'border-[#e1ece5] bg-white'"
-        @click="store.selectedBundle = bundle"
+        v-for="plan in store.plans"
+        :key="plan.id"
+        class="rounded-lg border p-4 text-start transition hover:border-[#FACE0B]"
+        :class="store.selectedPlan?.id === plan.id ? 'border-[#202020] bg-[#FFF8D7]' : 'border-[#EFE6B8] bg-white'"
+        @click="store.selectedPlan = plan"
       >
-        <p class="text-2xl font-black">${{ formatAmount(bundle.amount) }}</p>
-        <p class="mt-2 text-sm font-bold text-[#60706b]">{{ bundle.credits }} {{ store.lang === 'ar' ? 'نقاط' : 'credits' }}</p>
+        <p v-if="plan.oldAmount" class="text-sm font-bold text-[#9B8D45] line-through">${{ formatAmount(plan.oldAmount) }}</p>
+        <p class="mt-1 text-4xl font-black text-[#202020]">${{ formatAmount(plan.amount) }}</p>
+        <p class="mt-3 text-xs font-semibold text-[#6B6756]">{{ plan.name }}</p>
+        <p class="mt-1 text-lg font-black text-[#202020]">{{ plan.durationLabel }}</p>
       </button>
     </div>
-    <div class="flex gap-3">
-      <AppButton variant="secondary" @click="store.setStep('method')">{{ store.t.back }}</AppButton>
-      <AppButton class="flex-1" :disabled="!store.selectedBundle" @click="store.setStep('details')">{{ store.t.continue }}</AppButton>
-    </div>
+    <AppButton class="w-full" :disabled="!store.selectedPlan" @click="store.nextAfterPlan()">{{ store.t.continue }}</AppButton>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { LoaderCircle } from 'lucide-vue-next'
 import AppButton from '@/components/AppButton.vue'
 import { usePortalStore } from '@/stores/portalStore'
 
 const store = usePortalStore()
-const visibleBundles = computed(() => (store.selectedMethod?.type === 'sms' ? store.bundles.filter((b) => Number(b.amount) <= 3) : store.bundles))
 const formatAmount = (amount) => (Number(amount) % 1 === 0 ? Number(amount).toFixed(0) : Number(amount).toFixed(2))
 </script>
