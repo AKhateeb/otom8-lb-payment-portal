@@ -26,7 +26,28 @@
     </template>
 
     <template v-else-if="store.selectedMethod?.type === 'whish'">
-      <section class="overflow-hidden rounded-lg border border-[#EFE6B8] bg-white">
+      <section
+        v-if="config.isDebug && store.payment?.debugSimulationToken"
+        class="rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 p-5 text-amber-950"
+      >
+        <p class="text-xs font-black uppercase tracking-wider text-amber-700">{{ store.t.debugOnly }}</p>
+        <h3 class="mt-1 text-xl font-black">{{ store.t.debugWhishTitle }}</h3>
+        <p class="mt-2 text-sm leading-6">{{ store.t.debugWhishBody }}</p>
+        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+          <AppButton
+            :disabled="store.loading"
+            :loading="store.loadingAction === 'debugWhish'"
+            @click="store.simulateWhishPayment()"
+          >
+            {{ store.t.debugWhishSimulate }}
+          </AppButton>
+          <AppButton variant="secondary" :disabled="store.loading" @click="store.openWhishPayment()">
+            {{ store.t.debugWhishOpenGateway }}
+          </AppButton>
+        </div>
+      </section>
+
+      <section v-if="!store.payment?.debugSimulationToken" class="overflow-hidden rounded-lg border border-[#EFE6B8] bg-white">
         <div class="flex items-center justify-between gap-3 border-b border-[#EFE6B8] bg-[#FFFCED] px-4 py-3">
           <p class="text-sm font-black text-[#202020]">{{ store.t.whishGuideTitle }}</p>
           <button

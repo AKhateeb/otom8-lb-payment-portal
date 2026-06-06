@@ -1,5 +1,6 @@
 import { appConfig } from '@/config/appConfig'
 import { apiClient } from './apiClient'
+import { executeRecaptcha } from './recaptchaService'
 
 const unwrapData = (body) => body?.data?.data || body?.data || body || {}
 const listData = (body) => {
@@ -51,24 +52,36 @@ export async function getPlans(lang = 'en') {
 }
 
 export async function createDraftPayment({ amount, method, registeredPhone, senderPhone }) {
-  const response = await apiClient.post(appConfig.payment.endpoints.draftPayment, {
+  const recaptchaToken = await executeRecaptcha()
+  const response = await apiClient.post('/pay/sms-units', {
     method,
     amount,
     user_phone: registeredPhone,
-    phone_number: registeredPhone,
     sender_phone: senderPhone || registeredPhone,
+    recaptcha_token: recaptchaToken,
   })
-  return unwrapData(response)
+  const data = unwrapData(response)
+  return { ...data, id: data.payment_id || data.id }
 }
 
 export async function createWhishPayment({ amount, registeredPhone }) {
+  const recaptchaToken = await executeRecaptcha()
   const response = await apiClient.post(appConfig.payment.endpoints.createWhish, {
     amount: formatMoney(amount),
     currency: appConfig.payment.currency,
     user_phone: registeredPhone,
+    recaptcha_token: recaptchaToken,
+    debug_mode: appConfig.isDebug && appConfig.debugWhishSimulationEnabled,
   })
   const data = unwrapData(response)
   return data.payment_id || data.paymentId || data.id ? data : { id: data }
+}
+
+export async function simulateWhishSuccess(paymentId, simulationToken) {
+  const response = await apiClient.post(appConfig.payment.endpoints.debugWhishSuccess(paymentId), {
+    simulation_token: simulationToken,
+  })
+  return unwrapData(response)
 }
 
 export async function getPaymentStatus(paymentId) {
@@ -90,16 +103,21 @@ export async function confirmPayment(paymentId) {
 }
 
 export async function checkPromoCode(code, registeredPhone) {
+  const recaptchaToken = await executeRecaptcha()
   const response = await apiClient.post(appConfig.payment.endpoints.promoCheck, {
     promocode: code.trim().toUpperCase(),
     user_phone: registeredPhone,
+    recaptcha_token: recaptchaToken,
   })
   return unwrapData(response)
 }
 
-export async function consumePromoCode(promoCodeId) {
+export async function consumePromoCode(promoCodeId, registeredPhone) {
+  const recaptchaToken = await executeRecaptcha()
   const response = await apiClient.post(appConfig.payment.endpoints.promoConsume, {
     promocode_id: promoCodeId,
+    user_phone: registeredPhone,
+    recaptcha_token: recaptchaToken,
   })
   return unwrapData(response)
 }

@@ -39,7 +39,10 @@ export function describeApiError(error) {
 
 export function logApiDebug(label, value) {
   if (!appConfig.isDebug) return
-  console.info(`[PaymentPortal] ${label}`, value)
+  const safeValue = value?.data?.recaptcha_token
+    ? { ...value, data: { ...value.data, recaptcha_token: '[redacted]' } }
+    : value
+  console.info(`[PaymentPortal] ${label}`, safeValue)
 }
 
 apiClient.interceptors.request.use((config) => {

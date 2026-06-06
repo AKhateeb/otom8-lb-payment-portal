@@ -13,6 +13,7 @@ This portal is a focused Ejet Elkahraba subscription payment flow. It collects t
 - Axios
 - Tailwind CSS v4
 - Firebase Hosting
+- Google invisible reCAPTCHA v2
 - `libphonenumber-js`
 - `canvas-confetti`
 
@@ -29,6 +30,10 @@ This portal is a focused Ejet Elkahraba subscription payment flow. It collects t
 There is no OTP auth in the portal. The configured shared token is used for payment operations. The frontend never queries `/users` by phone; it sends the account phone to `/pay` and relies on that endpoint to accept or reject the request without exposing a separate account-existence check.
 
 Important: Vite exposes all `VITE_*` values in the built bundle. The backend token must remain tightly scoped.
+
+## Bot Protection
+
+Payment creation and promo-code validation execute invisible reCAPTCHA v2 in the browser and send the short-lived token to the Ejet backend. The backend verifies the token with Google, checks that its hostname is `pay.ejet-elkahraba.com`, and rejects payment creation when verification fails. The reCAPTCHA secret is stored only in the backend environment.
 
 ## Plans
 
@@ -60,7 +65,7 @@ Whish:
 SMS units:
 
 1. Detect Alfa/Touch from the account phone when `VITE_ENABLE_CARRIER_DETECTION=true`.
-2. Create a draft payment with `{ method, amount, user_phone }` when the payment screen opens.
+2. Create a draft payment through `POST /pay/sms-units` with `{ method, amount, user_phone, recaptcha_token }` when the payment screen opens.
 3. On mobile, show one large Send Units button that opens the native SMS app with a `$3` chunk or the remaining amount.
 4. On desktop, show the carrier SMS shortcode and exact message body in a clear two-step instruction card.
 5. Show one I sent the units action to check backend progress on both mobile and desktop.
@@ -69,10 +74,17 @@ SMS units:
 
 Promo code:
 
-1. Check the code through `/promocode/check/`.
-2. Consume with `{ promocode_id }`.
+1. Check the code through `/promocode/check/` with the entered account phone and a reCAPTCHA token.
+2. Consume with `{ promocode_id, user_phone, recaptcha_token }`.
 3. Show success when the backend accepts it.
 
 ## Debugging
 
 Debug mode shows API request/response details in the UI and can call `/sms-gateway/webhook` when `VITE_ENABLE_DEBUG_SMS_WEBHOOK=true`.
+
+When `VITE_ENABLE_DEBUG_WHISH_SIMULATION=true`, the Whish flow pauses after reCAPTCHA verification and payment creation. For the configured test phone only, it shows:
+
+1. **Simulate successful payment**, which calls the signed debug callback endpoint and then verifies the updated payment status.
+2. **Open Whish payment page**, which continues to the real gateway.
+
+Production builds keep `VITE_ENABLE_DEBUG_WHISH_SIMULATION=false` and redirect to Whish immediately after payment creation.

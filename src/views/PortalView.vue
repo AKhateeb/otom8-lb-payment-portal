@@ -118,6 +118,12 @@
           <ShieldCheck class="h-4 w-4" />
           {{ store.t.privacyPolicy }}
         </a>
+        <p class="w-full text-center text-xs leading-5 text-[#6B6756]">
+          {{ store.lang === 'ar' ? 'هذا الموقع محمي بواسطة reCAPTCHA وتطبق سياسة الخصوصية وشروط الخدمة من Google.' : 'This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.' }}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" class="font-bold underline">Privacy</a>
+          <span aria-hidden="true"> · </span>
+          <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" class="font-bold underline">Terms</a>
+        </p>
       </footer>
     </div>
   </main>

@@ -8,6 +8,7 @@ export const appConfig = {
   whishBaseUrl: (import.meta.env.VITE_WHISH_BASE_URL || import.meta.env.VITE_DIRECTUS_API_URL || 'https://app.ejet-elkahraba.com').replace(/\/$/, ''),
   paymentToken: import.meta.env.VITE_PAYMENT_API_TOKEN || '',
   debugSmsWebhookEnabled: import.meta.env.VITE_ENABLE_DEBUG_SMS_WEBHOOK === 'true',
+  debugWhishSimulationEnabled: import.meta.env.VITE_ENABLE_DEBUG_WHISH_SIMULATION === 'true',
   enableCarrierDetection: import.meta.env.VITE_ENABLE_CARRIER_DETECTION !== 'false',
   showSummaryStep: import.meta.env.VITE_SHOW_PAYMENT_SUMMARY === 'true',
   identity: {
@@ -60,6 +61,7 @@ export const appConfig = {
       promoCheck: '/promocode/check/',
       promoConsume: '/promocode/consume/',
       smsWebhook: '/sms-gateway/webhook',
+      debugWhishSuccess: (id) => `/payments-callback/debug-success/${encodeURIComponent(id)}`,
     },
     carriers: {
       alfa: {
@@ -95,5 +97,8 @@ export const appConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  },
+  recaptcha: {
+    siteKey: import.meta.env.VITE_RECAPTCHA_SITE_KEY || '',
   },
 }

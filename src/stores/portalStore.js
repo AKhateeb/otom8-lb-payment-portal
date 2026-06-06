@@ -319,7 +319,7 @@ export const usePortalStore = defineStore('portal', () => {
       if (!promoCodeId) throw new Error('Promocode check did not return an id')
 
       try {
-        const result = await payments.consumePromoCode(promoCodeId)
+        const result = await payments.consumePromoCode(promoCodeId, registeredPhone.value)
         pushDebug('promo.consume.success', result)
         completeSuccess()
       } catch (apiError) {
@@ -377,11 +377,38 @@ export const usePortalStore = defineStore('portal', () => {
       }
       payment.value = { ...payment.value, link, whishLinkReady: true }
       persist()
+      if (appConfig.isDebug && appConfig.debugWhishSimulationEnabled && draft.debug_simulation_token) {
+        payment.value = { ...payment.value, debugSimulationToken: draft.debug_simulation_token }
+        paymentStarted.value = false
+        pushDebug('whish.debug.ready', { paymentId })
+        return
+      }
       leavingForPayment.value = true
       window.location.assign(link)
     } catch (apiError) {
       paymentStarted.value = false
       setApiError('whish.create.failed', apiError, t.value.whishCreateError)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function openWhishPayment() {
+    if (!payment.value?.link) return
+    leavingForPayment.value = true
+    window.location.assign(payment.value.link)
+  }
+
+  async function simulateWhishPayment() {
+    if (!appConfig.isDebug || !appConfig.debugWhishSimulationEnabled || !payment.value?.debugSimulationToken) return
+    setLoading(true, t.value.debugWhishSimulating, 'debugWhish')
+    error.value = ''
+    try {
+      const result = await payments.simulateWhishSuccess(payment.value.id, payment.value.debugSimulationToken)
+      pushDebug('whish.debug.simulated', result)
+      await checkCurrentPayment()
+    } catch (apiError) {
+      setApiError('whish.debug.failed', apiError, t.value.debugFailed)
     } finally {
       setLoading(false)
     }
@@ -704,6 +731,8 @@ export const usePortalStore = defineStore('portal', () => {
     prepareSmsPayment,
     sendNextSms,
     openSmsAppAgain,
+    openWhishPayment,
+    simulateWhishPayment,
     sendSmsDebugWebhook,
     checkCurrentPayment,
     completeSuccess,
