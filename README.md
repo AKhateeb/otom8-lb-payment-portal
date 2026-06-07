@@ -1,6 +1,6 @@
 # Ejet Payment Portal
 
-Vue 3 CSR payment portal for Ejet Elkahraba subscriptions.
+Vue 3 CSR payment portal for Ejet Elkahraba app subscriptions.
 
 ## Quick Start
 

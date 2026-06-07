@@ -12,10 +12,10 @@ export const appConfig = {
   enableCarrierDetection: import.meta.env.VITE_ENABLE_CARRIER_DETECTION !== 'false',
   showSummaryStep: import.meta.env.VITE_SHOW_PAYMENT_SUMMARY === 'true',
   identity: {
-    appName: 'Ejet Elkahraba',
+    appName: 'Ejet Elkahraba App',
     portalName: 'Ejet Pay',
-    title: 'Renew Ejet Elkahraba',
-    titleAr: 'جدد اشتراك إيجت الكهرباء',
+    title: 'Renew the Ejet Elkahraba App',
+    titleAr: 'جدد اشتراك تطبيق إجت الكهربا',
     subtitle: 'Renew quickly with Whish, phone units, or an activation code.',
     subtitleAr: 'جدد بسرعة عبر Whish أو وحدات الهاتف أو كود التفعيل.',
     logo: '/assets/brand/logo.svg',

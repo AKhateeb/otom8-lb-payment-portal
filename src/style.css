@@ -18,6 +18,12 @@ body {
   min-width: 320px;
   min-height: 100svh;
   margin: 0;
+  overflow-x: hidden;
+}
+
+img,
+svg {
+  max-width: 100%;
 }
 
 button,
@@ -96,7 +102,33 @@ button:disabled {
     linear-gradient(rgba(250, 206, 11, 0.38) 1px, transparent 1px),
     linear-gradient(90deg, rgba(32, 32, 32, 0.1) 1px, transparent 1px);
   background-size: 42px 42px;
-  animation: grid-drift 10s linear infinite;
+  animation: grid-drift 18s linear infinite;
+}
+
+.ambient-orb {
+  will-change: transform;
+  animation: ambient-float 12s ease-in-out infinite alternate;
+}
+
+.ambient-orb-two {
+  animation-duration: 16s;
+  animation-direction: alternate-reverse;
+}
+
+.footer-link {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding-inline: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #5f5b4c;
+  transition: color 160ms ease;
+}
+
+.footer-link:hover {
+  color: #202020;
 }
 
 .pulse-line {
@@ -162,6 +194,15 @@ button:disabled {
   }
 }
 
+@keyframes ambient-float {
+  from {
+    transform: translate3d(-3%, -2%, 0) scale(0.96);
+  }
+  to {
+    transform: translate3d(8%, 7%, 0) scale(1.08);
+  }
+}
+
 @keyframes whish-progress {
   from {
     transform: translateX(-82%);
@@ -194,11 +235,30 @@ button:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ambient-orb,
+  .float-band,
+  .float-band-delayed,
+  .payment-grid,
+  .pulse-line,
   .payment-steps-cta,
   .payment-steps-icon,
   .whish-step-enter-active,
   .whish-step-leave-active {
     animation: none;
     transition: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .portal-shell {
+    min-height: 100dvh;
+  }
+
+  .portal-card {
+    width: 100%;
+  }
+
+  .portal-phone-input .vti__dropdown {
+    min-width: 7.25rem;
   }
 }

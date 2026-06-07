@@ -1,21 +1,21 @@
 <template>
-  <main :dir="store.isRtl ? 'rtl' : 'ltr'" class="min-h-svh text-[#202020]">
+  <main :dir="store.isRtl ? 'rtl' : 'ltr'" class="min-h-svh overflow-x-hidden text-[#202020]">
     <LiveBackground />
-    <div class="mx-auto flex min-h-svh w-full max-w-2xl flex-col px-4 py-4 sm:px-6">
-      <header class="flex items-center justify-between gap-4">
-        <div class="flex items-center">
-          <img :src="config.identity.splashLogo" :alt="config.identity.appName" class="h-20 w-20 object-contain sm:h-24 sm:w-24" />
+    <div class="portal-shell mx-auto flex min-h-svh w-full max-w-2xl flex-col px-3 pb-3 pt-2 sm:px-6 sm:py-4">
+      <header class="flex min-h-16 items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center">
+          <img :src="config.identity.splashLogo" :alt="config.identity.appName" class="h-16 w-16 shrink-0 object-contain sm:h-24 sm:w-24" />
         </div>
-        <div class="flex items-center gap-2">
-          <span v-if="config.isDebug" class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{{ store.t.debugMode }}</span>
-          <button class="rounded-full border border-[#EFE6B8] bg-white px-3 py-1 text-sm font-bold" @click="store.lang = store.lang === 'ar' ? 'en' : 'ar'">
+        <div class="flex min-w-0 items-center justify-end gap-2">
+          <span v-if="config.isDebug" class="hidden rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 xs:inline-flex sm:inline-flex">{{ store.t.debugMode }}</span>
+          <button class="min-h-10 rounded-full bg-white/85 px-3 text-sm font-bold shadow-sm ring-1 ring-black/5 backdrop-blur transition hover:bg-white" @click="store.lang = store.lang === 'ar' ? 'en' : 'ar'">
             {{ store.lang === 'ar' ? 'English' : 'العربية' }}
           </button>
         </div>
       </header>
 
-      <section class="flex flex-1 flex-col justify-center gap-5 py-6">
-        <section class="rounded-xl border border-white/80 bg-white/94 p-4 shadow-2xl shadow-yellow-950/10 backdrop-blur sm:p-6">
+      <section class="flex flex-1 flex-col justify-center gap-4 py-3 sm:gap-5 sm:py-6">
+        <section class="portal-card rounded-2xl bg-white/95 p-4 shadow-xl shadow-yellow-950/10 backdrop-blur-md sm:border sm:border-white/80 sm:p-6 sm:shadow-2xl">
           <div v-if="showBackButton" class="mb-4 flex">
             <button
               class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#E5D98E] bg-[#FFF8D7] px-4 text-sm font-black text-[#202020] transition hover:border-[#202020] hover:bg-[#FACE0B] focus:outline-none focus:ring-2 focus:ring-[#FACE0B] focus:ring-offset-2 disabled:opacity-50"
@@ -81,44 +81,44 @@
         </aside>
       </section>
 
-      <footer class="flex flex-wrap items-center justify-center gap-3 pb-4">
+      <footer class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-1 pb-2 pt-2 text-[#5f5b4c] sm:pb-4">
         <a
           :href="config.identity.websiteUrl"
           target="_blank"
           rel="noreferrer"
-          class="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#EFE6B8] bg-white px-3 text-sm font-bold text-[#202020] hover:border-[#202020]"
+          class="footer-link"
         >
-          <Globe class="h-4 w-4" />
+          <Globe class="h-3.5 w-3.5" />
           {{ store.t.websiteLink }}
         </a>
         <a
           :href="config.identity.whatsappUrl"
           target="_blank"
           rel="noreferrer"
-          class="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#EFE6B8] bg-white px-3 text-sm font-bold text-[#202020] hover:border-[#25D366] hover:bg-[#25D366]/5"
+          class="footer-link"
         >
-          <img src="/assets/payment/whatsapp.svg" alt="" class="h-5 w-5 shrink-0" />
+          <img src="/assets/payment/whatsapp.svg" alt="" class="h-4 w-4 shrink-0" />
           {{ store.t.contactUs }}
         </a>
         <a
           :href="legalUrl('terms-of-use')"
           target="_blank"
           rel="noreferrer"
-          class="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#EFE6B8] bg-white px-3 text-sm font-bold text-[#202020] hover:border-[#202020]"
+          class="footer-link"
         >
-          <FileText class="h-4 w-4" />
+          <FileText class="h-3.5 w-3.5" />
           {{ store.t.termsOfUse }}
         </a>
         <a
           :href="legalUrl('privacy-policy')"
           target="_blank"
           rel="noreferrer"
-          class="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#EFE6B8] bg-white px-3 text-sm font-bold text-[#202020] hover:border-[#202020]"
+          class="footer-link"
         >
-          <ShieldCheck class="h-4 w-4" />
+          <ShieldCheck class="h-3.5 w-3.5" />
           {{ store.t.privacyPolicy }}
         </a>
-        <p class="w-full text-center text-xs leading-5 text-[#6B6756]">
+        <p class="mt-1 w-full text-center text-[11px] leading-5 text-[#77715d]">
           {{ store.lang === 'ar' ? 'هذا الموقع محمي بواسطة reCAPTCHA وتطبق سياسة الخصوصية وشروط الخدمة من Google.' : 'This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.' }}
           <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" class="font-bold underline">Privacy</a>
           <span aria-hidden="true"> · </span>
@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { ArrowLeft, ArrowRight, FileText, Globe, LoaderCircle, ShieldCheck } from 'lucide-vue-next'
 import LiveBackground from '@/components/LiveBackground.vue'
 import { appConfig as config } from '@/config/appConfig'
@@ -153,6 +153,18 @@ const showSmsDebugPanel = computed(
     store.currentStep === 'payment' &&
     store.selectedMethod?.type === 'sms' &&
     Boolean(store.payment?.id),
+)
+
+watch(
+  () => store.lang,
+  (lang) => {
+    document.documentElement.lang = lang === 'ar' ? 'ar-LB' : 'en-LB'
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
+    document.title = lang === 'ar'
+      ? 'إجت باي | تجديد اشتراك تطبيق إجت الكهربا'
+      : 'Ejet Pay | Renew the Ejet Elkahraba App in Lebanon'
+  },
+  { immediate: true },
 )
 
 function goBack() {

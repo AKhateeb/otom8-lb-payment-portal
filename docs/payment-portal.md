@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This portal is a focused Ejet Elkahraba subscription payment flow. It collects the user account phone, reads the current plan table, and delegates account and payment validation to the Ejet backend.
+This portal is a focused Ejet Elkahraba app subscription payment flow. It collects the user account phone, reads the current plan table, and delegates account and payment validation to the Ejet backend.
 
 ## Stack
 

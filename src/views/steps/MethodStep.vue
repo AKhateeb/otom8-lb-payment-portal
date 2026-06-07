@@ -8,7 +8,7 @@
       <button
         v-for="method in store.methods"
         :key="method.id"
-        class="flex items-center gap-4 rounded-lg border p-4 text-start transition hover:border-[#FACE0B] hover:bg-[#FFF8D7]"
+        class="flex min-h-20 items-center gap-3 rounded-xl border p-3.5 text-start transition hover:border-[#FACE0B] hover:bg-[#FFF8D7] sm:gap-4 sm:p-4"
         :class="store.selectedMethod?.id === method.id ? 'border-[#202020] bg-[#FFF8D7]' : 'border-[#EFE6B8] bg-white'"
         @click="store.selectMethod(method)"
       >
