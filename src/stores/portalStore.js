@@ -46,6 +46,7 @@ export const usePortalStore = defineStore('portal', () => {
   const payment = ref(null)
   const paymentStarted = ref(false)
   const leavingForPayment = ref(false)
+  const openingExternalApp = ref(false)
   const smsUnitsSent = ref(0)
   const smsLastCollected = ref(0)
   const smsCheckResult = ref('')
@@ -54,8 +55,10 @@ export const usePortalStore = defineStore('portal', () => {
   const loadingMessage = ref('')
   const loadingAction = ref('')
   const error = ref('')
+  const captchaRetryAvailable = ref(false)
   const debugEvents = ref([])
   const success = ref(false)
+  let captchaRetryAction = null
 
   const isRtl = computed(() => lang.value === 'ar')
   const t = computed(() => dictionary[lang.value] || dictionary.en)
@@ -175,15 +178,41 @@ export const usePortalStore = defineStore('portal', () => {
     payment.value = null
     paymentStarted.value = false
     leavingForPayment.value = false
+    openingExternalApp.value = false
     smsUnitsSent.value = 0
     smsLastCollected.value = 0
     smsCheckResult.value = ''
     smsAwaitingConfirmation.value = false
   }
 
-  function setApiError(label, apiError, fallbackMessage = t.value.friendlyError) {
+  function clearCaptchaRetry() {
+    captchaRetryAction = null
+    captchaRetryAvailable.value = false
+  }
+
+  function isCaptchaError(apiError, details) {
+    const errorText = [
+      apiError?.message,
+      details.backendCode,
+      details.backendMessage,
+      JSON.stringify(details.responseBody || {}),
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+    return /(?:re)?captcha/i.test(errorText) && !/missing VITE_RECAPTCHA_SITE_KEY/i.test(errorText)
+  }
+
+  function setApiError(label, apiError, fallbackMessage = t.value.friendlyError, retryAction = null) {
     const details = describeApiError(apiError)
     pushDebug(label, details)
+    clearCaptchaRetry()
+    if (retryAction && isCaptchaError(apiError, details)) {
+      error.value = t.value.captchaError
+      captchaRetryAction = retryAction
+      captchaRetryAvailable.value = true
+      return
+    }
     if (details.status === 403 && label.toLowerCase().includes('status')) {
       error.value = t.value.statusForbidden
       return
@@ -191,9 +220,18 @@ export const usePortalStore = defineStore('portal', () => {
     error.value = `${fallbackMessage}${appConfig.isDebug && (details.status || details.backendMessage) ? ` (${details.status || 'local'}: ${details.backendMessage})` : ''}`
   }
 
+  async function retryCaptcha() {
+    if (!captchaRetryAction || loading.value) return
+    const retryAction = captchaRetryAction
+    clearCaptchaRetry()
+    error.value = ''
+    await retryAction()
+  }
+
   function selectMethod(method) {
     selectedMethod.value = method
     resetPaymentState()
+    clearCaptchaRetry()
     error.value = ''
     setStep('phone')
   }
@@ -306,7 +344,7 @@ export const usePortalStore = defineStore('portal', () => {
         checked = await payments.checkPromoCode(promoCode.value, registeredPhone.value)
         pushDebug('promo.check.success', checked)
       } catch (apiError) {
-        setApiError('promo.check.failed', apiError, t.value.codeInvalid)
+        setApiError('promo.check.failed', apiError, t.value.codeInvalid, startPayment)
         return
       }
 
@@ -317,13 +355,17 @@ export const usePortalStore = defineStore('portal', () => {
         checked.promocode?.id ||
         checked.data?.id
       if (!promoCodeId) throw new Error('Promocode check did not return an id')
+      const consumeProof =
+        checked.consume_proof ||
+        checked.consumeProof ||
+        checked.data?.consume_proof
 
       try {
-        const result = await payments.consumePromoCode(promoCodeId, registeredPhone.value)
+        const result = await payments.consumePromoCode(promoCodeId, registeredPhone.value, consumeProof)
         pushDebug('promo.consume.success', result)
         completeSuccess()
       } catch (apiError) {
-        setApiError('promo.consume.failed', apiError, t.value.codeInvalid)
+        setApiError('promo.consume.failed', apiError, t.value.codeInvalid, startPayment)
       }
     } catch (error) {
       pushDebug('promo.response.invalid', { message: error.message, checked })
@@ -337,6 +379,7 @@ export const usePortalStore = defineStore('portal', () => {
   async function startPayment() {
     if (paymentStarted.value) return
     paymentStarted.value = true
+    clearCaptchaRetry()
     error.value = ''
 
     if (selectedMethod.value?.type === 'promo') {
@@ -387,7 +430,7 @@ export const usePortalStore = defineStore('portal', () => {
       window.location.assign(link)
     } catch (apiError) {
       paymentStarted.value = false
-      setApiError('whish.create.failed', apiError, t.value.whishCreateError)
+      setApiError('whish.create.failed', apiError, t.value.whishCreateError, submitWhish)
     } finally {
       setLoading(false)
     }
@@ -440,11 +483,15 @@ export const usePortalStore = defineStore('portal', () => {
       payment.value = { ...payment.value, smsHref: href, lastChunk: chunk }
       smsUnitsSent.value = Math.min(selectedAmount.value, smsUnitsSent.value + chunk)
       pushDebug('sms.open', { paymentId: payment.value.id, href, chunk, sent: smsUnitsSent.value, remaining: smsRemaining.value })
+      openingExternalApp.value = true
       window.location.href = href
+      window.setTimeout(() => {
+        openingExternalApp.value = false
+      }, 1500)
       pollPayment(payment.value.id, 'sms')
     } catch (apiError) {
       paymentStarted.value = false
-      setApiError('sms.draft.failed', apiError, t.value.smsCreateError)
+      setApiError('sms.draft.failed', apiError, t.value.smsCreateError, prepareSmsPayment)
     } finally {
       setLoading(false)
     }
@@ -470,7 +517,7 @@ export const usePortalStore = defineStore('portal', () => {
       return Boolean(payment.value.id)
     } catch (apiError) {
       paymentStarted.value = false
-      setApiError('sms.draft.failed', apiError, t.value.smsCreateError)
+      setApiError('sms.draft.failed', apiError, t.value.smsCreateError, prepareSmsPayment)
       return false
     } finally {
       setLoading(false)
@@ -480,7 +527,11 @@ export const usePortalStore = defineStore('portal', () => {
   function openSmsAppAgain() {
     if (!payment.value?.smsHref) return
     pushDebug('sms.open_again', { smsHref: payment.value.smsHref })
+    openingExternalApp.value = true
     window.location.href = payment.value.smsHref
+    window.setTimeout(() => {
+      openingExternalApp.value = false
+    }, 1500)
   }
 
   async function sendSmsDebugWebhook() {
@@ -668,10 +719,12 @@ export const usePortalStore = defineStore('portal', () => {
     payment.value = null
     paymentStarted.value = false
     leavingForPayment.value = false
+    openingExternalApp.value = false
     smsUnitsSent.value = 0
     smsLastCollected.value = 0
     smsCheckResult.value = ''
     smsAwaitingConfirmation.value = false
+    clearCaptchaRetry()
     error.value = ''
     debugEvents.value = []
     success.value = false
@@ -699,6 +752,7 @@ export const usePortalStore = defineStore('portal', () => {
     payment,
     paymentStarted,
     leavingForPayment,
+    openingExternalApp,
     smsUnitsSent,
     smsLastCollected,
     smsCheckResult,
@@ -712,6 +766,7 @@ export const usePortalStore = defineStore('portal', () => {
     loadingMessage,
     loadingAction,
     error,
+    captchaRetryAvailable,
     debugEvents,
     success,
     hasDirtyInput,
@@ -735,6 +790,7 @@ export const usePortalStore = defineStore('portal', () => {
     simulateWhishPayment,
     sendSmsDebugWebhook,
     checkCurrentPayment,
+    retryCaptcha,
     completeSuccess,
     reset,
   }

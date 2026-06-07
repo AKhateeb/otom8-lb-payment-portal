@@ -2,13 +2,18 @@
   <main :dir="store.isRtl ? 'rtl' : 'ltr'" class="min-h-svh overflow-x-hidden text-[#202020]">
     <LiveBackground />
     <div class="portal-shell mx-auto flex min-h-svh w-full max-w-2xl flex-col px-3 pb-3 pt-2 sm:px-6 sm:py-4">
-      <header class="flex min-h-16 items-center justify-between gap-3">
-        <div class="flex min-w-0 items-center">
-          <img :src="config.identity.splashLogo" :alt="config.identity.appName" class="h-16 w-16 shrink-0 object-contain sm:h-24 sm:w-24" />
+      <header class="grid min-h-16 grid-cols-3 items-center gap-2 px-1 py-1 sm:min-h-24 sm:gap-4 sm:px-2 sm:py-2">
+        <div class="flex min-w-0 items-center justify-start">
+          <img :src="config.identity.splashLogo" :alt="config.identity.appName" class="h-14 w-14 shrink-0 object-contain sm:h-20 sm:w-20 lg:h-24 lg:w-24" />
+        </div>
+        <div class="min-w-0 px-1 text-center sm:px-3">
+          <p class="text-xs font-black leading-tight text-[#202020] sm:text-base lg:text-lg">
+            {{ store.lang === 'ar' ? config.identity.titleAr : config.identity.portalName }}
+          </p>
         </div>
         <div class="flex min-w-0 items-center justify-end gap-2">
           <span v-if="config.isDebug" class="hidden rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 xs:inline-flex sm:inline-flex">{{ store.t.debugMode }}</span>
-          <button class="min-h-10 rounded-full bg-white/85 px-3 text-sm font-bold shadow-sm ring-1 ring-black/5 backdrop-blur transition hover:bg-white" @click="store.lang = store.lang === 'ar' ? 'en' : 'ar'">
+          <button class="min-h-9 rounded-full bg-white/85 px-2.5 text-xs font-bold shadow-sm ring-1 ring-black/5 backdrop-blur transition hover:bg-white sm:min-h-10 sm:px-3 sm:text-sm" @click="store.lang = store.lang === 'ar' ? 'en' : 'ar'">
             {{ store.lang === 'ar' ? 'English' : 'العربية' }}
           </button>
         </div>
@@ -38,8 +43,17 @@
             <LoaderCircle class="h-5 w-5 animate-spin text-[#202020]" />
             {{ store.loadingMessage || store.t.loading }}
           </div>
-          <div v-if="store.error" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">
-            {{ store.error === 'friendly' ? store.t.friendlyError : store.error }}
+          <div v-if="store.error" class="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800 sm:flex-row sm:items-center sm:justify-between">
+            <span>{{ store.error === 'friendly' ? store.t.friendlyError : store.error }}</span>
+            <button
+              v-if="store.captchaRetryAvailable"
+              class="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-red-800 px-4 font-black text-white transition hover:bg-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="store.loading"
+              @click="store.retryCaptcha()"
+            >
+              <RefreshCw class="h-4 w-4" />
+              {{ store.t.retryCaptcha }}
+            </button>
           </div>
 
           <WelcomeStep v-if="store.currentStep === 'welcome'" />
@@ -131,7 +145,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, watch } from 'vue'
-import { ArrowLeft, ArrowRight, FileText, Globe, LoaderCircle, ShieldCheck } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, FileText, Globe, LoaderCircle, RefreshCw, ShieldCheck } from 'lucide-vue-next'
 import LiveBackground from '@/components/LiveBackground.vue'
 import { appConfig as config } from '@/config/appConfig'
 import { usePortalStore } from '@/stores/portalStore'
@@ -162,7 +176,7 @@ watch(
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
     document.title = lang === 'ar'
       ? 'إجت باي | تجديد اشتراك تطبيق إجت الكهربا'
-      : 'Ejet Pay | Renew the Ejet Elkahraba App in Lebanon'
+      : 'Ejet Elkahraba - Payment Portal | Renew the Ejet Elkahraba App in Lebanon'
   },
   { immediate: true },
 )
@@ -202,7 +216,7 @@ function legalUrl(slug) {
 }
 
 function beforeUnload(event) {
-  if (!store.hasDirtyInput || store.currentStep === 'success' || store.leavingForPayment) return
+  if (!store.hasDirtyInput || store.currentStep === 'success' || store.leavingForPayment || store.openingExternalApp) return
   event.preventDefault()
   event.returnValue = ''
 }

@@ -12,7 +12,10 @@ function loadRecaptcha() {
     const existingScript = document.getElementById(SCRIPT_ID)
     if (existingScript) {
       existingScript.addEventListener('load', () => window.grecaptcha.ready(() => resolve(window.grecaptcha)), { once: true })
-      existingScript.addEventListener('error', () => reject(new Error('reCAPTCHA failed to load')), { once: true })
+      existingScript.addEventListener('error', () => {
+        existingScript.remove()
+        reject(new Error('reCAPTCHA failed to load'))
+      }, { once: true })
       return
     }
 
@@ -22,7 +25,10 @@ function loadRecaptcha() {
     script.async = true
     script.defer = true
     script.onload = () => window.grecaptcha.ready(() => resolve(window.grecaptcha))
-    script.onerror = () => reject(new Error('reCAPTCHA failed to load'))
+    script.onerror = () => {
+      script.remove()
+      reject(new Error('reCAPTCHA failed to load'))
+    }
     document.head.appendChild(script)
   })
 }

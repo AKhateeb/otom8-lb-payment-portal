@@ -112,13 +112,17 @@ export async function checkPromoCode(code, registeredPhone) {
   return unwrapData(response)
 }
 
-export async function consumePromoCode(promoCodeId, registeredPhone) {
-  const recaptchaToken = await executeRecaptcha()
-  const response = await apiClient.post(appConfig.payment.endpoints.promoConsume, {
+export async function consumePromoCode(promoCodeId, registeredPhone, consumeProof) {
+  const payload = {
     promocode_id: promoCodeId,
     user_phone: registeredPhone,
-    recaptcha_token: recaptchaToken,
-  })
+  }
+  if (consumeProof) {
+    payload.consume_proof = consumeProof
+  } else {
+    payload.recaptcha_token = await executeRecaptcha()
+  }
+  const response = await apiClient.post(appConfig.payment.endpoints.promoConsume, payload)
   return unwrapData(response)
 }
 

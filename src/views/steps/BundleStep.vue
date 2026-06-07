@@ -11,14 +11,15 @@
       <button
         v-for="plan in store.plans"
         :key="plan.id"
-        class="rounded-lg border p-4 text-start transition hover:border-[#FACE0B]"
+        class="rounded-lg border px-4 py-3 text-start transition hover:border-[#FACE0B]"
         :class="store.selectedPlan?.id === plan.id ? 'border-[#202020] bg-[#FFF8D7]' : 'border-[#EFE6B8] bg-white'"
         @click="store.selectedPlan = plan"
       >
         <p v-if="plan.oldAmount" class="text-sm font-bold text-[#9B8D45] line-through">${{ formatAmount(plan.oldAmount) }}</p>
-        <p class="mt-1 text-4xl font-black text-[#202020]">${{ formatAmount(plan.amount) }}</p>
-        <p class="mt-3 text-xs font-semibold text-[#6B6756]">{{ plan.name }}</p>
-        <p class="mt-1 text-lg font-black text-[#202020]">{{ plan.durationLabel }}</p>
+        <p class="mt-0.5 text-3xl font-black text-[#202020]">${{ formatAmount(plan.amount) }}</p>
+        <!-- Plan name hidden for now to keep subscription cards compact. -->
+        <!-- <p class="mt-3 text-xs font-semibold text-[#6B6756]">{{ plan.name }}</p> -->
+        <p class="mt-1 text-base font-black text-[#202020]">{{ plan.durationLabel }}</p>
       </button>
     </div>
     <AppButton class="w-full" :disabled="!store.selectedPlan" @click="store.nextAfterPlan()">{{ store.t.continue }}</AppButton>

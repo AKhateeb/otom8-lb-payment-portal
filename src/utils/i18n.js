@@ -1,11 +1,13 @@
 const ar = {
+  captchaError: 'تعذر التحقق من reCAPTCHA. حاول مرة أخرى لمتابعة الدفع.',
+  retryCaptcha: 'إعادة المحاولة',
   start: 'تجديد الاشتراك',
   back: 'رجوع',
   next: 'التالي',
   previous: 'السابق',
   skip: 'تخطي',
   continue: 'متابعة',
-  continueToWhish: 'فتح Whish والدفع',
+  continueToWhish: 'ادفع عبر Whish',
   phoneTitle: 'رقم الهاتف المسجل',
   phoneSubtitle: 'أدخل رقم الهاتف المسجّل في تطبيق إجت الكهربا.',
   phone: 'رقم الهاتف',
@@ -144,13 +146,15 @@ const ar = {
 }
 
 const en = {
+  captchaError: 'reCAPTCHA verification failed. Try again to continue your payment.',
+  retryCaptcha: 'Retry',
   start: 'Renew subscription',
   back: 'Back',
   next: 'Next',
   previous: 'Previous',
   skip: 'Skip',
   continue: 'Continue',
-  continueToWhish: 'Open Whish and pay',
+  continueToWhish: 'Pay with Whish',
   phoneTitle: 'Registered phone number',
   phoneSubtitle: 'Enter the phone number you use in the Ejet Elkahraba app.',
   phone: 'Phone number',
