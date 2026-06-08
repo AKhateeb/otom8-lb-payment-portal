@@ -52,7 +52,7 @@ Wizard order:
 5. Payment phone for SMS units only; Whish collects the payer phone inside its gateway.
 6. Optional summary controlled by `VITE_SHOW_PAYMENT_SUMMARY`.
 7. Payment execution.
-8. Success with `ejet://powerline` CTA.
+8. Success with `ejet://app` CTA.
 
 Whish:
 

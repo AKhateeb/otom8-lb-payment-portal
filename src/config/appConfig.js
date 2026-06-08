@@ -23,7 +23,7 @@ export const appConfig = {
     supportPhone: '+96181554661',
     websiteUrl: 'https://ejet-elkahraba.com',
     whatsappUrl: 'https://wa.me/96181554661',
-    appDeepLink: 'ejet://powerline',
+    appDeepLink: 'ejet://app',
     domainHint: 'pay.ejet-elkahraba.com',
   },
   theme: {
