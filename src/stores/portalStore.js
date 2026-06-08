@@ -605,7 +605,8 @@ export const usePortalStore = defineStore('portal', () => {
 
         if (payments.isSuccessStatus(latest.status)) {
           smsAwaitingConfirmation.value = false
-          await payments.confirmPayment(payment.value.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
+          // Confirmation is handled outside the portal now.
+          // await payments.confirmPayment(payment.value.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
           completeSuccess()
           return
         }
@@ -647,7 +648,8 @@ export const usePortalStore = defineStore('portal', () => {
       updatePaymentFromStatus(latest)
       pushDebug('payment.status', latest)
       if (payments.isSuccessStatus(latest.status)) {
-        await payments.confirmPayment(payment.value.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
+        // Confirmation is handled outside the portal now.
+        // await payments.confirmPayment(payment.value.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
         completeSuccess()
       } else if (payments.isFailedStatus(latest.status)) {
         error.value = t.value.friendlyError
@@ -683,7 +685,8 @@ export const usePortalStore = defineStore('portal', () => {
         pushDebug(`${source}.poll.status`, latest)
         if (payments.isSuccessStatus(latest.status)) {
           window.clearInterval(timer)
-          await payments.confirmPayment(paymentId).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
+          // Confirmation is handled outside the portal now.
+          // await payments.confirmPayment(paymentId).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
           completeSuccess()
         }
         if (payments.isFailedStatus(latest.status) || count > maxPolls) {
