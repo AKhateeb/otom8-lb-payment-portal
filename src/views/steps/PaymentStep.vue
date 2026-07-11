@@ -257,7 +257,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppButton from '@/components/AppButton.vue'
 import { appConfig as config } from '@/config/appConfig'
 import { usePortalStore } from '@/stores/portalStore'
@@ -313,7 +313,27 @@ function advanceWhish() {
   activeWhishSlide.value += 1
 }
 
-onMounted(() => {
-  if (store.selectedMethod?.type === 'sms') store.prepareSmsPayment()
+function syncSmsPayment() {
+  if (store.selectedMethod?.type === 'sms' && store.payment?.id) {
+    store.syncCurrentPayment()
+  }
+}
+
+function syncSmsPaymentWhenVisible() {
+  if (document.visibilityState === 'visible') syncSmsPayment()
+}
+
+onMounted(async () => {
+  if (store.selectedMethod?.type === 'sms') {
+    await store.prepareSmsPayment()
+    syncSmsPayment()
+    window.addEventListener('focus', syncSmsPayment)
+    document.addEventListener('visibilitychange', syncSmsPaymentWhenVisible)
+  }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', syncSmsPayment)
+  document.removeEventListener('visibilitychange', syncSmsPaymentWhenVisible)
 })
 </script>

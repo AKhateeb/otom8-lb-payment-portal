@@ -1,6 +1,12 @@
 import axios from 'axios'
 import { appConfig } from '@/config/appConfig'
 
+function requestUrl(config = {}) {
+  const base = `${config.baseURL || ''}${config.url || ''}`
+  const params = config.params ? new URLSearchParams(config.params).toString() : ''
+  return params ? `${base}${base.includes('?') ? '&' : '?'}${params}` : base
+}
+
 export const apiClient = axios.create({
   baseURL: appConfig.apiBaseUrl,
   timeout: 25000,
@@ -29,7 +35,7 @@ export function describeApiError(error) {
   return {
     status,
     method: error?.config?.method?.toUpperCase(),
-    url: `${error?.config?.baseURL || ''}${error?.config?.url || ''}`,
+    url: requestUrl(error?.config),
     backendMessage,
     backendCode,
     responseBody: responseData,
@@ -48,7 +54,7 @@ export function logApiDebug(label, value) {
 apiClient.interceptors.request.use((config) => {
   logApiDebug('request', {
     method: config.method?.toUpperCase(),
-    url: `${config.baseURL || ''}${config.url || ''}`,
+    url: requestUrl(config),
     data: config.data,
   })
   return config
@@ -58,7 +64,7 @@ apiClient.interceptors.response.use(
   (response) => {
     logApiDebug('response', {
       status: response.status,
-      url: `${response.config?.baseURL || ''}${response.config?.url || ''}`,
+      url: requestUrl(response.config),
       data: response.data,
     })
     return response

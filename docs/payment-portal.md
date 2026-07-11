@@ -74,7 +74,7 @@ SMS units:
 
 Promo code:
 
-1. Check the code through `/promocode/check/` with the entered account phone and a reCAPTCHA token.
+1. Check the code through `/promocode/check/` with the activation code and a reCAPTCHA token.
 2. Consume with `{ promocode_id, user_phone, recaptcha_token }`.
 3. Show success when the backend accepts it.
 

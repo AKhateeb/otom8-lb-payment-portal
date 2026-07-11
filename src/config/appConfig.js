@@ -55,7 +55,7 @@ export const appConfig = {
       draftPayment: '/items/payment?fields=id,status,amount,amount_collected,user,method,description',
       createWhish: '/pay/whish',
       paymentDetails: (id) =>
-        `/items/payment?fields=id,status,amount,amount_collected,validated_at,method,description,payment_link&filter[id][_eq]=${encodeURIComponent(id)}&limit=1`,
+        `/items/payment/${encodeURIComponent(id)}?fields=id,status,amount,amount_collected,validated_at,method,description,payment_link`,
       confirmPayment: (id) =>
         `/items/payment/${encodeURIComponent(id)}?fields=id,status,confirmed_at`,
       promoCheck: '/promocode/check/',
@@ -83,7 +83,7 @@ export const appConfig = {
         title: 'Touch units',
         titleAr: 'وحدات تاتش',
         shortCode: '1199',
-        receiver: '79013155',
+        receiver: '70057663',
         operator: 'touch',
         icon: '/assets/payment/touch.png',
         brandColor: '#009FBC',

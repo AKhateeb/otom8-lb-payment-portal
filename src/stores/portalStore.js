@@ -31,6 +31,9 @@ function buildSmsHref({ shortCode, receiver, amount }) {
   return `sms:${digitsOnly(shortCode)}?body=${encodeURIComponent(body)}`
 }
 
+const SMS_STATUS_CHECK_ATTEMPTS = 45
+const SMS_STATUS_CHECK_INTERVAL_MS = 1500
+
 export const usePortalStore = defineStore('portal', () => {
   const lang = ref(detectLanguage())
   const session = ref(savedSession())
@@ -341,7 +344,7 @@ export const usePortalStore = defineStore('portal', () => {
     try {
       let checked
       try {
-        checked = await payments.checkPromoCode(promoCode.value, registeredPhone.value)
+        checked = await payments.checkPromoCode(promoCode.value)
         pushDebug('promo.check.success', checked)
       } catch (apiError) {
         setApiError('promo.check.failed', apiError, t.value.codeInvalid, startPayment)
@@ -367,8 +370,8 @@ export const usePortalStore = defineStore('portal', () => {
       } catch (apiError) {
         setApiError('promo.consume.failed', apiError, t.value.codeInvalid, startPayment)
       }
-    } catch (error) {
-      pushDebug('promo.response.invalid', { message: error.message, checked })
+    } catch (promoError) {
+      pushDebug('promo.response.invalid', { message: promoError.message, checked })
       error.value = t.value.codeInvalid
     } finally {
       if (!success.value) paymentStarted.value = false
@@ -591,10 +594,10 @@ export const usePortalStore = defineStore('portal', () => {
     }
   }
 
-  async function waitForSmsWebhookUpdate({ sentAmount, expectedCollected }) {
-    for (let attempt = 1; attempt <= 15; attempt += 1) {
+  async function waitForSmsWebhookUpdate({ sentAmount = 0, expectedCollected = selectedAmount.value } = {}) {
+    for (let attempt = 1; attempt <= SMS_STATUS_CHECK_ATTEMPTS; attempt += 1) {
       if (attempt > 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1000))
+        await new Promise((resolve) => window.setTimeout(resolve, SMS_STATUS_CHECK_INTERVAL_MS))
       }
 
       try {
@@ -656,6 +659,10 @@ export const usePortalStore = defineStore('portal', () => {
       } else {
         if (selectedMethod.value?.type === 'sms') {
           smsAwaitingConfirmation.value = smsRemaining.value <= 0
+          if (smsAwaitingConfirmation.value) {
+            await waitForSmsWebhookUpdate()
+            return
+          }
           smsCheckResult.value = smsAwaitingConfirmation.value
             ? ''
             : smsLastCollected.value > 0
@@ -669,6 +676,31 @@ export const usePortalStore = defineStore('portal', () => {
       setApiError('payment.status.failed', apiError, t.value.paymentPending)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function syncCurrentPayment() {
+    if (!payment.value?.id || success.value) return
+    try {
+      const latest = await payments.getPaymentStatus(payment.value.id)
+      updatePaymentFromStatus(latest)
+      pushDebug('payment.sync.status', latest)
+
+      if (payments.isSuccessStatus(latest.status)) {
+        completeSuccess()
+        return
+      }
+
+      if (selectedMethod.value?.type === 'sms') {
+        smsAwaitingConfirmation.value = smsRemaining.value <= 0
+        smsCheckResult.value = smsAwaitingConfirmation.value
+          ? ''
+          : smsLastCollected.value > 0
+            ? 'partial'
+            : smsCheckResult.value
+      }
+    } catch (apiError) {
+      pushDebug('payment.sync.failed', describeApiError(apiError))
     }
   }
 
@@ -793,6 +825,7 @@ export const usePortalStore = defineStore('portal', () => {
     simulateWhishPayment,
     sendSmsDebugWebhook,
     checkCurrentPayment,
+    syncCurrentPayment,
     retryCaptcha,
     completeSuccess,
     reset,

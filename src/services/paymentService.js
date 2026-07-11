@@ -92,7 +92,8 @@ export async function getPaymentStatus(paymentId) {
       Pragma: 'no-cache',
     },
   })
-  return listData(response)[0] || {}
+  const data = unwrapData(response)
+  return Array.isArray(data) ? data[0] || {} : data
 }
 
 export async function confirmPayment(paymentId) {
@@ -102,11 +103,10 @@ export async function confirmPayment(paymentId) {
   return unwrapData(response)
 }
 
-export async function checkPromoCode(code, registeredPhone) {
+export async function checkPromoCode(code) {
   const recaptchaToken = await executeRecaptcha()
   const response = await apiClient.post(appConfig.payment.endpoints.promoCheck, {
     promocode: code.trim().toUpperCase(),
-    user_phone: registeredPhone,
     recaptcha_token: recaptchaToken,
   })
   return unwrapData(response)
