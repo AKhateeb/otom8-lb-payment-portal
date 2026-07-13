@@ -43,7 +43,7 @@
             <LoaderCircle class="h-5 w-5 animate-spin text-[#202020]" />
             {{ store.loadingMessage || store.t.loading }}
           </div>
-          <div v-if="store.error" class="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800 sm:flex-row sm:items-center sm:justify-between">
+          <div v-if="store.error && !showPaymentInlineError" class="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800 sm:flex-row sm:items-center sm:justify-between">
             <span>{{ store.error === 'friendly' ? store.t.friendlyError : store.error }}</span>
             <button
               v-if="store.captchaRetryAvailable"
@@ -160,6 +160,14 @@ import SuccessStep from './steps/SuccessStep.vue'
 
 const store = usePortalStore()
 const showBackButton = computed(() => !['welcome', 'success'].includes(store.currentStep))
+const showPaymentInlineError = computed(
+  () =>
+    store.currentStep === 'payment' &&
+    store.selectedMethod?.type === 'sms' &&
+    Boolean(store.error) &&
+    !store.payment?.id &&
+    !store.captchaRetryAvailable,
+)
 const showSmsDebugPanel = computed(
   () =>
     config.isDebug &&

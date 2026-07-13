@@ -133,21 +133,36 @@
     </template>
 
     <template v-else>
-      <div class="rounded-lg border border-[#EFE6B8] bg-[#FFFCED] p-5 text-center">
-        <img
-          v-if="store.selectedMethod?.carrier?.icon"
-          :src="store.selectedMethod.carrier.icon"
-          :alt="store.selectedMethod.title"
-          class="mx-auto mb-3 h-12 w-12 rounded-lg object-contain"
-        />
-        <template v-if="isMobileDevice">
-          <h3 class="text-xl font-black text-[#202020]">{{ store.t.smsSimpleTitle }}</h3>
-          <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6B6756]">{{ store.t.smsSimpleBody }}</p>
+      <div
+        class="rounded-lg border p-5 text-center"
+        :class="smsSetupError ? 'border-red-200 bg-red-50 text-red-900' : 'border-[#EFE6B8] bg-[#FFFCED]'"
+      >
+        <template v-if="smsSetupError">
+          <AlertTriangle class="mx-auto mb-3 h-8 w-8 text-red-600" />
+          <p class="mx-auto max-w-lg text-sm leading-6 text-red-800">{{ inlineSmsError }}</p>
+          <button
+            class="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-800 transition hover:border-red-300 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
+            @click="editRegisteredPhone"
+          >
+            {{ store.t.editPhone }}
+          </button>
         </template>
-        <p v-else class="mx-auto max-w-lg text-sm font-bold leading-6 text-[#202020]">{{ store.t.smsDesktopInstruction }}</p>
+        <template v-else>
+          <img
+            v-if="store.selectedMethod?.carrier?.icon"
+            :src="store.selectedMethod.carrier.icon"
+            :alt="store.selectedMethod.title"
+            class="mx-auto mb-3 h-12 w-12 rounded-lg object-contain"
+          />
+          <template v-if="isMobileDevice">
+            <h3 class="text-xl font-black text-[#202020]">{{ store.t.smsSimpleTitle }}</h3>
+            <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6B6756]">{{ store.t.smsSimpleBody }}</p>
+          </template>
+          <p v-else class="mx-auto max-w-lg text-sm font-bold leading-6 text-[#202020]">{{ store.t.smsDesktopInstruction }}</p>
+        </template>
       </div>
 
-      <section v-if="!isMobileDevice" class="rounded-lg border border-[#EFE6B8] bg-white p-4 sm:p-6">
+      <section v-if="!isMobileDevice && !smsSetupError" class="rounded-lg border border-[#EFE6B8] bg-white p-4 sm:p-6">
         <div class="grid gap-4 md:grid-cols-2">
           <div class="rounded-xl border-2 p-4 text-center sm:p-5" :style="smsInstructionCardStyle">
             <p class="text-xs font-black uppercase tracking-wider sm:text-sm" :style="{ color: smsCarrierColor }">{{ store.t.smsSendTo }}</p>
@@ -216,7 +231,7 @@
 
       <div class="grid gap-3">
         <button
-          v-if="isMobileDevice"
+          v-if="isMobileDevice && !smsSetupError"
           class="inline-flex min-h-16 w-full items-center justify-center rounded-xl bg-[#202020] px-6 text-lg font-black text-[#FACE0B] shadow-lg shadow-yellow-900/10 transition hover:bg-[#0f0f0f] disabled:opacity-50"
           :disabled="store.loading"
           @click="store.sendNextSms()"
@@ -241,7 +256,7 @@
         </a>
       </aside>
 
-      <div>
+      <div v-if="!smsSetupError">
         <AppButton
           class="w-full"
           :variant="isMobileDevice ? 'secondary' : 'primary'"
@@ -258,6 +273,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { AlertTriangle } from 'lucide-vue-next'
 import AppButton from '@/components/AppButton.vue'
 import { appConfig as config } from '@/config/appConfig'
 import { usePortalStore } from '@/stores/portalStore'
@@ -300,6 +316,15 @@ const smsCollectedProgress = computed(() => {
   if (!store.selectedAmount) return 0
   return Math.min(100, (store.smsLastCollected / store.selectedAmount) * 100)
 })
+const smsSetupError = computed(
+  () => store.selectedMethod?.type === 'sms' && Boolean(store.error) && !store.payment?.id && !store.captchaRetryAvailable,
+)
+const inlineSmsError = computed(() => (store.error === 'friendly' ? store.t.friendlyError : store.error))
+
+function editRegisteredPhone() {
+  store.error = ''
+  store.setStep('phone')
+}
 
 function openWhish() {
   store.startPayment()

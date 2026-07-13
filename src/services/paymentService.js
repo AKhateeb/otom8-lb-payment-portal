@@ -149,6 +149,11 @@ export function isSuccessStatus(status) {
   return ['validated', 'completed', 'paid', 'success', 'succeeded', 'confirmed'].includes(String(status || '').toLowerCase())
 }
 
+export function isSuccessfulPayment(payment) {
+  if (!payment || typeof payment !== 'object') return isSuccessStatus(payment)
+  return isSuccessStatus(payment.status) || Boolean(payment.validated_at || payment.validatedAt)
+}
+
 export function isFailedStatus(status) {
   return ['failed', 'failure', 'declined', 'cancelled', 'canceled', 'rejected', 'expired', 'void'].includes(String(status || '').toLowerCase())
 }

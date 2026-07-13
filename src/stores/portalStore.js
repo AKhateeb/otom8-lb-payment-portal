@@ -26,6 +26,23 @@ const savedSession = () => {
   }
 }
 
+function restoreSelectedMethod(method) {
+  if (!method) return null
+  if (method.type !== 'sms') return method
+
+  const carrierId = method.carrier?.id || method.id
+  const carrier = appConfig.payment.carriers[carrierId] || method.carrier
+  if (!carrier) return method
+
+  return {
+    ...method,
+    id: carrier.id,
+    carrier,
+    title: method.title || carrier.title,
+    icon: method.icon || carrier.icon,
+  }
+}
+
 function buildSmsHref({ shortCode, receiver, amount }) {
   const body = `${digitsOnly(receiver)}t${Number(amount).toFixed(0)}`
   return `sms:${digitsOnly(shortCode)}?body=${encodeURIComponent(body)}`
@@ -41,19 +58,19 @@ export const usePortalStore = defineStore('portal', () => {
   const registeredPhone = ref(session.value.registeredPhone || '')
   const senderPhone = ref(session.value.senderPhone || '')
   const useSamePhone = ref(Boolean(registeredPhone.value && isLebanesePhone(registeredPhone.value)))
-  const selectedMethod = ref(null)
-  const selectedPlan = ref(null)
+  const selectedMethod = ref(restoreSelectedMethod(session.value.selectedMethod))
+  const selectedPlan = ref(session.value.selectedPlan || null)
   const promoCode = ref('')
   const plans = ref([])
   const plansLanguage = ref('')
-  const payment = ref(null)
+  const payment = ref(session.value.payment || null)
   const paymentStarted = ref(false)
   const leavingForPayment = ref(false)
   const openingExternalApp = ref(false)
-  const smsUnitsSent = ref(0)
-  const smsLastCollected = ref(0)
-  const smsCheckResult = ref('')
-  const smsAwaitingConfirmation = ref(false)
+  const smsUnitsSent = ref(Number(session.value.smsUnitsSent || 0))
+  const smsLastCollected = ref(Number(session.value.smsLastCollected || 0))
+  const smsCheckResult = ref(session.value.smsCheckResult || '')
+  const smsAwaitingConfirmation = ref(Boolean(session.value.smsAwaitingConfirmation))
   const loading = ref(false)
   const loadingMessage = ref('')
   const loadingAction = ref('')
@@ -147,6 +164,13 @@ export const usePortalStore = defineStore('portal', () => {
         currentStep: currentStep.value,
         registeredPhone: registeredPhone.value,
         senderPhone: senderPhone.value,
+        selectedMethod: selectedMethod.value,
+        selectedPlan: selectedPlan.value,
+        payment: payment.value,
+        smsUnitsSent: smsUnitsSent.value,
+        smsLastCollected: smsLastCollected.value,
+        smsCheckResult: smsCheckResult.value,
+        smsAwaitingConfirmation: smsAwaitingConfirmation.value,
       }),
     )
   }
@@ -210,6 +234,10 @@ export const usePortalStore = defineStore('portal', () => {
     const details = describeApiError(apiError)
     pushDebug(label, details)
     clearCaptchaRetry()
+    if (details.status === 400 && /user not found/i.test(details.backendMessage || '')) {
+      error.value = t.value.accountNotFound
+      return
+    }
     if (retryAction && isCaptchaError(apiError, details)) {
       error.value = t.value.captchaError
       captchaRetryAction = retryAction
@@ -236,6 +264,7 @@ export const usePortalStore = defineStore('portal', () => {
     resetPaymentState()
     clearCaptchaRetry()
     error.value = ''
+    persist()
     setStep('phone')
   }
 
@@ -294,12 +323,14 @@ export const usePortalStore = defineStore('portal', () => {
       plans.value = rows.length ? rows : defaults
       plansLanguage.value = lang.value
       selectedPlan.value = plans.value.find((plan) => plan.planId === selectedPlanId) || plans.value[0]
+      persist()
       pushDebug('plans.loaded', { count: plans.value.length, plans: plans.value })
     } catch (apiError) {
       const defaults = fallbackPlans(lang.value)
       plans.value = defaults
       plansLanguage.value = lang.value
       selectedPlan.value = defaults.find((plan) => plan.planId === selectedPlanId) || defaults[0]
+      persist()
       setApiError('plans.failed_using_fallback', apiError, t.value.plansFallbackError)
     } finally {
       setLoading(false)
@@ -487,6 +518,7 @@ export const usePortalStore = defineStore('portal', () => {
       smsUnitsSent.value = Math.min(selectedAmount.value, smsUnitsSent.value + chunk)
       pushDebug('sms.open', { paymentId: payment.value.id, href, chunk, sent: smsUnitsSent.value, remaining: smsRemaining.value })
       openingExternalApp.value = true
+      persist()
       window.location.href = href
       window.setTimeout(() => {
         openingExternalApp.value = false
@@ -517,6 +549,7 @@ export const usePortalStore = defineStore('portal', () => {
       })
       payment.value = { ...draft, id: draft.id, status: draft.status || 'draft' }
       pushDebug('sms.draft.created', { draft, selectedAmount: selectedAmount.value })
+      persist()
       return Boolean(payment.value.id)
     } catch (apiError) {
       paymentStarted.value = false
@@ -545,9 +578,10 @@ export const usePortalStore = defineStore('portal', () => {
       const latestBeforeWebhook = await payments.getPaymentStatus(payment.value.id)
       updatePaymentFromStatus(latestBeforeWebhook)
 
-      if (payments.isSuccessStatus(latestBeforeWebhook.status)) {
+      if (payments.isSuccessfulPayment(latestBeforeWebhook)) {
         smsAwaitingConfirmation.value = false
-        completeSuccess()
+        persist()
+        await completeValidatedPayment(payment.value.id)
         return
       }
 
@@ -582,11 +616,9 @@ export const usePortalStore = defineStore('portal', () => {
       smsUnitsSent.value = Math.max(smsUnitsSent.value, expectedCollected)
       smsCheckResult.value = expectedCollected < selectedAmount.value ? 'partial' : ''
       smsAwaitingConfirmation.value = expectedCollected >= selectedAmount.value
+      persist()
 
       void waitForSmsWebhookUpdate({ sentAmount: amount, expectedCollected })
-      if (expectedCollected >= selectedAmount.value) {
-        completeSuccess()
-      }
     } catch (apiError) {
       setApiError('sms.webhook.failed', apiError, t.value.debugFailed)
     } finally {
@@ -606,11 +638,9 @@ export const usePortalStore = defineStore('portal', () => {
         updatePaymentFromStatus(latest)
         pushDebug('sms.webhook.status', { attempt, sentAmount, latest })
 
-        if (payments.isSuccessStatus(latest.status)) {
+        if (payments.isSuccessfulPayment(latest)) {
           smsAwaitingConfirmation.value = false
-          // Confirmation is handled outside the portal now.
-          // await payments.confirmPayment(payment.value.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
-          completeSuccess()
+          await completeValidatedPayment(payment.value.id)
           return
         }
 
@@ -625,6 +655,7 @@ export const usePortalStore = defineStore('portal', () => {
 
     smsCheckResult.value = smsLastCollected.value > 0 ? 'partial' : 'pending'
     smsAwaitingConfirmation.value = smsRemaining.value <= 0
+    persist()
   }
 
   function updatePaymentFromStatus(latest) {
@@ -636,6 +667,7 @@ export const usePortalStore = defineStore('portal', () => {
         ? Math.max(smsLastCollected.value, boundedCollected)
         : boundedCollected
     smsUnitsSent.value = Math.max(smsUnitsSent.value, smsLastCollected.value)
+    persist()
   }
 
   async function checkCurrentPayment() {
@@ -650,10 +682,8 @@ export const usePortalStore = defineStore('portal', () => {
       const latest = await payments.getPaymentStatus(payment.value.id)
       updatePaymentFromStatus(latest)
       pushDebug('payment.status', latest)
-      if (payments.isSuccessStatus(latest.status)) {
-        // Confirmation is handled outside the portal now.
-        // await payments.confirmPayment(payment.value.id).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
-        completeSuccess()
+      if (payments.isSuccessfulPayment(latest)) {
+        await completeValidatedPayment(payment.value.id)
       } else if (payments.isFailedStatus(latest.status)) {
         error.value = t.value.friendlyError
       } else {
@@ -686,8 +716,8 @@ export const usePortalStore = defineStore('portal', () => {
       updatePaymentFromStatus(latest)
       pushDebug('payment.sync.status', latest)
 
-      if (payments.isSuccessStatus(latest.status)) {
-        completeSuccess()
+      if (payments.isSuccessfulPayment(latest)) {
+        await completeValidatedPayment(payment.value.id)
         return
       }
 
@@ -715,11 +745,9 @@ export const usePortalStore = defineStore('portal', () => {
         const latest = await payments.getPaymentStatus(paymentId)
         updatePaymentFromStatus(latest)
         pushDebug(`${source}.poll.status`, latest)
-        if (payments.isSuccessStatus(latest.status)) {
+        if (payments.isSuccessfulPayment(latest)) {
           window.clearInterval(timer)
-          // Confirmation is handled outside the portal now.
-          // await payments.confirmPayment(paymentId).catch((apiError) => pushDebug('payment.confirm.failed', describeApiError(apiError)))
-          completeSuccess()
+          await completeValidatedPayment(paymentId)
         }
         if (payments.isFailedStatus(latest.status) || count > maxPolls) {
           window.clearInterval(timer)
@@ -739,6 +767,19 @@ export const usePortalStore = defineStore('portal', () => {
     confetti({ particleCount: 220, spread: 110, startVelocity: 42, origin: { y: 0.65 } })
     window.setTimeout(() => confetti({ particleCount: 160, spread: 90, origin: { x: 0.15, y: 0.55 } }), 280)
     window.setTimeout(() => confetti({ particleCount: 160, spread: 90, origin: { x: 0.85, y: 0.55 } }), 520)
+  }
+
+  async function completeValidatedPayment(paymentId = payment.value?.id) {
+    completeSuccess()
+    if (!paymentId) return
+
+    try {
+      const confirmed = await payments.confirmPayment(paymentId)
+      payment.value = { ...payment.value, ...confirmed }
+      pushDebug('payment.confirmed', confirmed)
+    } catch (apiError) {
+      pushDebug('payment.confirm.failed', describeApiError(apiError))
+    }
   }
 
   function reset() {
