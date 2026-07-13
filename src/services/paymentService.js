@@ -87,10 +87,6 @@ export async function simulateWhishSuccess(paymentId, simulationToken) {
 export async function getPaymentStatus(paymentId) {
   const response = await apiClient.get(appConfig.payment.endpoints.paymentDetails(paymentId), {
     params: { _t: Date.now() },
-    headers: {
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
-    },
   })
   const data = unwrapData(response)
   return Array.isArray(data) ? data[0] || {} : data

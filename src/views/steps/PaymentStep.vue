@@ -12,7 +12,7 @@
           v-model="store.promoCode"
           maxlength="32"
           class="min-h-12 w-full rounded-lg border border-[#EFE6B8] px-4 font-bold uppercase outline-none focus:border-[#202020] focus:ring-4 focus:ring-[#FACE0B]/25"
-          placeholder="EJETCODE"
+          placeholder=""
         />
       </label>
       <AppButton
