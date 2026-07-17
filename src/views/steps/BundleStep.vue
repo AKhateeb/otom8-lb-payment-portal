@@ -20,6 +20,24 @@
         <!-- Plan name hidden for now to keep subscription cards compact. -->
         <!-- <p class="mt-3 text-xs font-semibold text-[#6B6756]">{{ plan.name }}</p> -->
         <p class="mt-1 text-base font-black text-[#202020]">{{ plan.durationLabel }}</p>
+        <div
+          v-if="store.giftOfferForPlan(plan)"
+          class="mt-3 rounded-lg border border-[#E6D470] bg-[#FFFBDF] p-3"
+        >
+          <div class="flex items-start gap-2.5">
+            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#FACE0B] text-[#202020]">
+              <Gift class="h-4 w-4" />
+            </span>
+            <span class="min-w-0">
+              <span class="block text-sm font-extrabold leading-5 text-[#202020]">
+                {{ store.t.giftPlanBadge(store.giftOfferForPlan(plan).months) }}
+              </span>
+              <span class="mt-0.5 block text-xs font-semibold leading-5 text-[#6B6756]">
+                {{ store.t.giftPlanHint }}
+              </span>
+            </span>
+          </div>
+        </div>
       </button>
     </div>
     <AppButton class="w-full" :disabled="!store.selectedPlan" @click="store.nextAfterPlan()">{{ store.t.continue }}</AppButton>
@@ -27,7 +45,7 @@
 </template>
 
 <script setup>
-import { LoaderCircle } from 'lucide-vue-next'
+import { Gift, LoaderCircle } from 'lucide-vue-next'
 import AppButton from '@/components/AppButton.vue'
 import { usePortalStore } from '@/stores/portalStore'
 

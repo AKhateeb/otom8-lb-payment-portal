@@ -147,6 +147,53 @@ button:disabled {
   animation: whish-progress 1.15s ease-in-out infinite alternate;
 }
 
+.gift-claim-card::before {
+  content: "";
+  position: absolute;
+  inset-inline: -25%;
+  top: 0;
+  height: 0.35rem;
+  background: linear-gradient(90deg, transparent, #face0b, #31a13b, #face0b, transparent);
+  animation: gift-claim-sweep 2.8s ease-in-out infinite;
+}
+
+.gift-claim-card {
+  transform-origin: center;
+  animation: gift-card-scale 2.9s ease-in-out infinite;
+}
+
+.gift-attention-rows {
+  position: absolute;
+  inset: 0.75rem;
+  pointer-events: none;
+  opacity: 0.34;
+}
+
+.gift-attention-row {
+  display: block;
+  height: 0.55rem;
+  margin-top: 0.85rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(250, 206, 11, 0), rgba(250, 206, 11, 0.72), rgba(49, 161, 59, 0.28), rgba(250, 206, 11, 0));
+  transform: translateX(-34%);
+  animation: gift-row-drift 3.6s ease-in-out infinite;
+}
+
+.gift-attention-row:nth-child(2) {
+  width: 78%;
+  margin-inline-start: auto;
+  animation-delay: 0.45s;
+}
+
+.gift-attention-row:nth-child(3) {
+  width: 62%;
+  animation-delay: 0.9s;
+}
+
+.gift-field-focus {
+  animation: gift-field-pulse 2.7s ease-in-out infinite;
+}
+
 .whish-step-enter-active,
 .whish-step-leave-active {
   transition:
@@ -212,6 +259,50 @@ button:disabled {
   }
 }
 
+@keyframes gift-claim-sweep {
+  0%,
+  100% {
+    transform: translateX(-28%);
+    opacity: 0.48;
+  }
+  50% {
+    transform: translateX(28%);
+    opacity: 1;
+  }
+}
+
+@keyframes gift-card-scale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.018);
+  }
+}
+
+@keyframes gift-row-drift {
+  0%,
+  100% {
+    transform: translateX(-34%);
+    opacity: 0.18;
+  }
+  45% {
+    transform: translateX(18%);
+    opacity: 0.62;
+  }
+}
+
+@keyframes gift-field-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(250, 206, 11, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(250, 206, 11, 0.2);
+  }
+}
+
 @keyframes payment-steps-pulse {
   0%,
   100% {
@@ -242,6 +333,10 @@ button:disabled {
   .pulse-line,
   .payment-steps-cta,
   .payment-steps-icon,
+  .gift-claim-card,
+  .gift-claim-card::before,
+  .gift-attention-row,
+  .gift-field-focus,
   .whish-step-enter-active,
   .whish-step-leave-active {
     animation: none;

@@ -17,6 +17,10 @@
         <dt class="text-[#6B6756]">{{ store.t.plan }}</dt>
         <dd class="text-end font-bold">{{ store.selectedPlan.months }} {{ store.t.months }} · ${{ formatAmount(store.selectedPlan.amount) }}</dd>
       </div>
+      <div v-if="store.giftOffer" class="flex justify-between gap-4 p-4">
+        <dt class="text-[#6B6756]">{{ store.t.giftIncluded }}</dt>
+        <dd class="text-end font-bold">{{ store.t.giftSummaryBody(store.giftOffer.months) }}</dd>
+      </div>
       <div v-if="store.selectedMethod?.type === 'sms'" class="flex justify-between gap-4 p-4">
         <dt class="text-[#6B6756]">{{ store.t.paymentPhone }}</dt>
         <dd class="font-bold" dir="ltr">{{ store.senderPhone }}</dd>

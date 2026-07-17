@@ -61,6 +61,11 @@ export const usePortalStore = defineStore('portal', () => {
   const selectedMethod = ref(restoreSelectedMethod(session.value.selectedMethod))
   const selectedPlan = ref(session.value.selectedPlan || null)
   const promoCode = ref('')
+  const giftPhone = ref('')
+  const giftCountry = ref('LB')
+  const giftApplied = ref(false)
+  const giftResult = ref(null)
+  const giftError = ref('')
   const plans = ref([])
   const plansLanguage = ref('')
   const payment = ref(session.value.payment || null)
@@ -87,6 +92,7 @@ export const usePortalStore = defineStore('portal', () => {
   const selectedCarrier = computed(() => carrierForPhone(senderPhone.value))
   const needsPlan = computed(() => ['whish', 'sms'].includes(selectedMethod.value?.type))
   const needsSenderPhone = computed(() => selectedMethod.value?.type === 'sms')
+  const giftOffer = computed(() => giftOfferForPlan(selectedPlan.value))
   const smsRemaining = computed(() => Math.max(0, selectedAmount.value - smsLastCollected.value))
   const nextSmsChunk = computed(() => Math.min(3, smsRemaining.value || selectedAmount.value || 3))
   const canSendMoreSms = computed(() => selectedMethod.value?.type === 'sms' && smsRemaining.value > 0)
@@ -202,6 +208,11 @@ export const usePortalStore = defineStore('portal', () => {
   function resetPaymentState() {
     selectedPlan.value = null
     promoCode.value = ''
+    giftPhone.value = ''
+    giftCountry.value = 'LB'
+    giftApplied.value = false
+    giftResult.value = null
+    giftError.value = ''
     payment.value = null
     paymentStarted.value = false
     leavingForPayment.value = false
@@ -266,6 +277,14 @@ export const usePortalStore = defineStore('portal', () => {
     error.value = ''
     persist()
     setStep('phone')
+  }
+
+  function giftOfferForPlan(plan = selectedPlan.value) {
+    if (!['whish', 'sms'].includes(selectedMethod.value?.type)) return null
+    const months = Number(plan?.months || 0)
+    if (months >= 12) return { code: 'YEAR3M', months: 3 }
+    if (months === 6) return { code: '6MON1M', months: 1 }
+    return null
   }
 
   async function validateRegisteredPhone(input, country = 'LB') {
@@ -406,6 +425,61 @@ export const usePortalStore = defineStore('portal', () => {
       error.value = t.value.codeInvalid
     } finally {
       if (!success.value) paymentStarted.value = false
+      setLoading(false)
+    }
+  }
+
+  async function applyGiftRenewal(input = giftPhone.value, country = giftCountry.value) {
+    const offer = giftOffer.value
+    if (!offer || loading.value || giftApplied.value) return
+
+    const normalized = normalizePhone(input, country)
+    if (!normalized.valid) {
+      giftError.value = t.value.invalidPhone
+      return
+    }
+    if (normalized.e164 === registeredPhone.value) {
+      giftError.value = t.value.giftSamePhoneError
+      return
+    }
+
+    setLoading(true, t.value.giftApplying, 'gift')
+    giftError.value = ''
+    giftPhone.value = normalized.e164
+    giftCountry.value = normalized.country || country || 'LB'
+
+    try {
+      let checked
+      try {
+        checked = await payments.checkPromoCode(offer.code)
+        pushDebug('gift.check.success', { code: offer.code, checked })
+      } catch (apiError) {
+        pushDebug('gift.check.failed', describeApiError(apiError))
+        giftError.value = t.value.giftCodeError
+        return
+      }
+
+      const promoCodeId =
+        checked.id ||
+        checked.promocode_id ||
+        checked.promocodeId ||
+        checked.promocode?.id ||
+        checked.data?.id
+      if (!promoCodeId) throw new Error('Gift promocode check did not return an id')
+
+      const consumeProof =
+        checked.consume_proof ||
+        checked.consumeProof ||
+        checked.data?.consume_proof
+
+      const result = await payments.consumePromoCode(promoCodeId, normalized.e164, consumeProof)
+      giftApplied.value = true
+      giftResult.value = { phone: normalized.e164, code: offer.code, months: offer.months, result }
+      pushDebug('gift.consume.success', giftResult.value)
+    } catch (apiError) {
+      pushDebug('gift.consume.failed', describeApiError(apiError))
+      giftError.value = t.value.giftCodeError
+    } finally {
       setLoading(false)
     }
   }
@@ -792,6 +866,11 @@ export const usePortalStore = defineStore('portal', () => {
     selectedPlan.value = null
     plansLanguage.value = ''
     promoCode.value = ''
+    giftPhone.value = ''
+    giftCountry.value = 'LB'
+    giftApplied.value = false
+    giftResult.value = null
+    giftError.value = ''
     payment.value = null
     paymentStarted.value = false
     leavingForPayment.value = false
@@ -838,6 +917,12 @@ export const usePortalStore = defineStore('portal', () => {
     canSendMoreSms,
     selectedAmount,
     selectedMonths,
+    giftOffer,
+    giftPhone,
+    giftCountry,
+    giftApplied,
+    giftResult,
+    giftError,
     loading,
     loadingMessage,
     loadingAction,
@@ -853,6 +938,8 @@ export const usePortalStore = defineStore('portal', () => {
     selectMethod,
     validateRegisteredPhone,
     validateSenderPhone,
+    giftOfferForPlan,
+    applyGiftRenewal,
     loadPlans,
     nextAfterPhone,
     nextAfterPlan,
