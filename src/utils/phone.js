@@ -31,8 +31,8 @@ export function phoneLookupDigits(e164) {
   return digits.startsWith('961') ? digits.slice(3) : digits
 }
 
-export function carrierForPhone(e164) {
+export function carrierForPhone(e164, configuredCarriers = appConfig.payment.carriers) {
   const candidates = [String(e164 || ''), digitsOnly(e164), phoneLookupDigits(e164)]
-  const carriers = Object.values(appConfig.payment.carriers)
+  const carriers = Object.values(configuredCarriers || {})
   return carriers.find((carrier) => candidates.some((candidate) => carrier.pattern?.test(candidate))) || null
 }

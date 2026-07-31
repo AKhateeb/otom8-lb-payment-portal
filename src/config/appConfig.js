@@ -83,7 +83,7 @@ export const appConfig = {
         title: 'Touch units',
         titleAr: 'وحدات تاتش',
         shortCode: '1199',
-        receiver: '70057663',
+        receiver: '79090682',
         operator: 'touch',
         icon: '/assets/payment/touch.png',
         brandColor: '#009FBC',

@@ -229,6 +229,9 @@ function beforeUnload(event) {
   event.returnValue = ''
 }
 
-onMounted(() => window.addEventListener('beforeunload', beforeUnload))
+onMounted(() => {
+  store.loadSettingsInBackground()
+  window.addEventListener('beforeunload', beforeUnload)
+})
 onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>

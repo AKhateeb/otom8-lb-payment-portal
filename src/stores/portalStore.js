@@ -4,8 +4,64 @@ import { computed, ref, watch } from 'vue'
 import { appConfig } from '@/config/appConfig'
 import { describeApiError } from '@/services/apiClient'
 import * as payments from '@/services/paymentService'
+import * as portalSettings from '@/services/settingsService'
 import { dictionary, detectLanguage } from '@/utils/i18n'
 import { carrierForPhone, digitsOnly, isLebanesePhone, normalizePhone } from '@/utils/phone'
+
+const SMS_METHOD_KEYS = {
+  alfa: 'alfa_units',
+  touch: 'touch_units',
+}
+
+function normalizePaymentMethods(value) {
+  let methods = value
+  if (typeof methods === 'string') {
+    try {
+      methods = JSON.parse(methods)
+    } catch {
+      methods = methods.split(',')
+    }
+  }
+
+  if (!Array.isArray(methods)) return []
+
+  const normalized = methods
+    .map((method) => String(method || '').trim())
+    .filter(Boolean)
+
+  return normalized
+}
+
+function settingValue(value, fallback) {
+  const normalized = String(value ?? '').trim()
+  return normalized || fallback
+}
+
+function buildEffectiveCarriers(settings, paymentMethods) {
+  const patches = {
+    alfa: {
+      shortCode: settings?.alfa_units_target_code,
+      receiver: settings?.alfa_units_target_phone,
+    },
+    touch: {
+      shortCode: settings?.touch_units_target_code,
+      receiver: settings?.touch_units_phone,
+    },
+  }
+
+  return Object.fromEntries(
+    Object.entries(appConfig.payment.carriers)
+      .filter(([carrierId]) => paymentMethods.includes(SMS_METHOD_KEYS[carrierId]))
+      .map(([carrierId, carrier]) => [
+        carrierId,
+        {
+          ...carrier,
+          shortCode: settingValue(patches[carrierId]?.shortCode, carrier.shortCode),
+          receiver: settingValue(patches[carrierId]?.receiver, carrier.receiver),
+        },
+      ]),
+  )
+}
 
 function fallbackPlans(lang) {
   const isArabic = lang === 'ar'
@@ -53,6 +109,10 @@ const SMS_STATUS_CHECK_INTERVAL_MS = 1500
 
 export const usePortalStore = defineStore('portal', () => {
   const lang = ref(detectLanguage())
+  const settings = ref(null)
+  const settingsLoaded = ref(false)
+  const settingsError = ref('')
+  const settingsLoadStarted = ref(false)
   const session = ref(savedSession())
   const currentStep = ref(session.value.currentStep || 'welcome')
   const registeredPhone = ref(session.value.registeredPhone || '')
@@ -87,9 +147,13 @@ export const usePortalStore = defineStore('portal', () => {
 
   const isRtl = computed(() => lang.value === 'ar')
   const t = computed(() => dictionary[lang.value] || dictionary.en)
+  const settingsLoading = computed(() => settingsLoadStarted.value && !settingsLoaded.value && !settingsError.value)
+  const paymentMethods = computed(() => (settingsLoaded.value ? normalizePaymentMethods(settings.value?.payment_methods) : []))
+  const effectiveCarriers = computed(() => buildEffectiveCarriers(settings.value, paymentMethods.value))
+  const availableSmsCarriers = computed(() => Object.values(effectiveCarriers.value))
   const selectedAmount = computed(() => Number(selectedPlan.value?.amount || 0))
   const selectedMonths = computed(() => Number(selectedPlan.value?.months || 0))
-  const selectedCarrier = computed(() => carrierForPhone(senderPhone.value))
+  const selectedCarrier = computed(() => carrierForPhone(senderPhone.value, effectiveCarriers.value))
   const needsPlan = computed(() => ['whish', 'sms'].includes(selectedMethod.value?.type))
   const needsSenderPhone = computed(() => selectedMethod.value?.type === 'sms')
   const giftOffer = computed(() => giftOfferForPlan(selectedPlan.value))
@@ -117,7 +181,7 @@ export const usePortalStore = defineStore('portal', () => {
     return hints[currentStep.value] || hints.default || ''
   })
 
-  const methods = computed(() => {
+  const staticMethodsFallback = computed(() => {
     const items = [
       {
         id: 'whish-pay',
@@ -163,6 +227,68 @@ export const usePortalStore = defineStore('portal', () => {
     return items
   })
 
+  const methods = computed(() => {
+    const items = []
+    let smsAdded = false
+
+    const addSmsMethod = () => {
+      if (smsAdded || !availableSmsCarriers.value.length) return
+      smsAdded = true
+
+      if (appConfig.enableCarrierDetection) {
+        items.push({
+          id: 'sms-units',
+          type: 'sms',
+          title: lang.value === 'ar' ? 'وحدات الهاتف' : 'Phone units',
+          subtitle: lang.value === 'ar' ? 'أرسل وحدات من خط Alfa أو Touch.' : 'Send units from an Alfa or Touch line.',
+          icons: availableSmsCarriers.value.map((carrier) => carrier.icon),
+        })
+        return
+      }
+
+      availableSmsCarriers.value.forEach((carrier) => {
+        items.push({
+          id: carrier.id,
+          type: 'sms',
+          carrier,
+          title: carrier[lang.value === 'ar' ? 'titleAr' : 'title'],
+          subtitle: lang.value === 'ar' ? 'أرسل الوحدات برسالة جاهزة.' : 'Send units with a prepared SMS.',
+          icon: carrier.icon,
+        })
+      })
+    }
+
+    paymentMethods.value.forEach((method) => {
+      if (method === 'whish') {
+        items.push({
+          id: 'whish-pay',
+          type: 'whish',
+          title: 'Whish Pay',
+          subtitle: lang.value === 'ar' ? 'ادفع بأمان عبر Whish.' : 'Pay securely with Whish.',
+          icon: '/assets/payment/whish.png',
+        })
+        return
+      }
+
+      if (method === 'touch_units' || method === 'alfa_units') {
+        addSmsMethod()
+        return
+      }
+
+      if (method === 'promocode') {
+        items.push({
+          id: 'promocode',
+          type: 'promo',
+          title: lang.value === 'ar' ? 'كود تفعيل' : 'Activation code',
+          subtitle: lang.value === 'ar' ? 'أدخل الكود ونفعل الاشتراك.' : 'Enter the code and we activate the subscription.',
+          icon: '/assets/payment/coupon.png',
+        })
+      }
+    })
+
+    return items
+  })
+
   function persist() {
     sessionStorage.setItem(
       'payment_portal_session',
@@ -192,6 +318,65 @@ export const usePortalStore = defineStore('portal', () => {
     debugEvents.value.unshift(entry)
     debugEvents.value = debugEvents.value.slice(0, 12)
     console.info(`[PaymentPortal] ${label}`, detail)
+  }
+
+  function selectedMethodIsAllowed(method) {
+    if (!method) return true
+    if (method.type === 'whish') return paymentMethods.value.includes('whish')
+    if (method.type === 'promo') return paymentMethods.value.includes('promocode')
+    if (method.type === 'sms') {
+      if (!availableSmsCarriers.value.length) return false
+      const carrierId = method.carrier?.id || method.id
+      return method.id === 'sms-units' || Boolean(effectiveCarriers.value[carrierId])
+    }
+    return false
+  }
+
+  function syncSelectedMethodWithSettings() {
+    if (!selectedMethod.value) return
+
+    if (!selectedMethodIsAllowed(selectedMethod.value)) {
+      selectedMethod.value = null
+      resetPaymentState()
+      error.value = ''
+      if (!['welcome', 'method', 'success'].includes(currentStep.value)) currentStep.value = 'method'
+      persist()
+      return
+    }
+
+    if (selectedMethod.value.type !== 'sms') return
+
+    const carrierId = selectedMethod.value.carrier?.id || selectedMethod.value.id
+    const carrier = effectiveCarriers.value[carrierId]
+    if (!carrier) return
+
+    selectedMethod.value = {
+      ...selectedMethod.value,
+      id: appConfig.enableCarrierDetection ? selectedMethod.value.id : carrier.id,
+      carrier,
+      title: carrier[lang.value === 'ar' ? 'titleAr' : 'title'],
+      icon: carrier.icon,
+    }
+    persist()
+  }
+
+  async function loadSettingsInBackground(force = false) {
+    if (settingsLoadStarted.value && !force) return
+    settingsLoadStarted.value = true
+    if (force) settingsLoaded.value = false
+    settingsError.value = ''
+
+    try {
+      const result = await portalSettings.getPaymentPortalSettings()
+      settings.value = result || {}
+      settingsLoaded.value = true
+      syncSelectedMethodWithSettings()
+      pushDebug('settings.loaded', settings.value)
+    } catch (apiError) {
+      const details = describeApiError(apiError)
+      settingsError.value = details.backendMessage || apiError?.message || 'Settings could not be loaded'
+      pushDebug('settings.failed', details)
+    }
   }
 
   function setLoading(value, message = '', action = '') {
@@ -310,7 +495,7 @@ export const usePortalStore = defineStore('portal', () => {
       return false
     }
     if (selectedMethod.value?.type === 'sms') {
-      const detectedCarrier = carrierForPhone(normalized.e164)
+      const detectedCarrier = carrierForPhone(normalized.e164, effectiveCarriers.value)
       if (!isLebanesePhone(normalized.e164) || (appConfig.enableCarrierDetection && !detectedCarrier)) {
         error.value = t.value.lebaneseOnly
         return false
@@ -923,6 +1108,9 @@ export const usePortalStore = defineStore('portal', () => {
     giftApplied,
     giftResult,
     giftError,
+    settingsLoading,
+    settingsLoaded,
+    settingsError,
     loading,
     loadingMessage,
     loadingAction,
@@ -936,6 +1124,7 @@ export const usePortalStore = defineStore('portal', () => {
     needsSenderPhone,
     setStep,
     selectMethod,
+    loadSettingsInBackground,
     validateRegisteredPhone,
     validateSenderPhone,
     giftOfferForPlan,
