@@ -57,9 +57,10 @@ function buildEffectiveCarriers(settings, paymentMethods) {
         {
           ...carrier,
           shortCode: settingValue(patches[carrierId]?.shortCode, carrier.shortCode),
-          receiver: settingValue(patches[carrierId]?.receiver, carrier.receiver),
+          receiver: settingValue(patches[carrierId]?.receiver, ''),
         },
-      ]),
+      ])
+      .filter(([, carrier]) => Boolean(carrier.receiver)),
   )
 }
 
