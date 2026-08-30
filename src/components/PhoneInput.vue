@@ -1,6 +1,6 @@
 <template>
   <label class="block">
-    <span class="mb-2 block text-sm font-semibold text-[#202020]">{{ label }}</span>
+    <span class="mb-2 block text-sm font-semibold text-[#202020]" dir="auto">{{ label }}</span>
     <VueTelInput
       ref="phoneInputRef"
       :model-value="modelValue"

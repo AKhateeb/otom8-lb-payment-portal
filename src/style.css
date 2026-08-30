@@ -76,11 +76,21 @@ button:disabled {
   direction: ltr;
 }
 
+html:lang(ar) .portal-phone-input .vti__search_box {
+  direction: rtl;
+  text-align: right;
+}
+
 .portal-phone-input .vti__input {
   min-height: 3rem;
   color: #202020;
   direction: ltr;
   text-align: left;
+}
+
+html:lang(ar) .portal-phone-input .vti__input:placeholder-shown {
+  direction: rtl;
+  text-align: right;
 }
 
 .payment-steps-cta {

@@ -1,16 +1,17 @@
 <template>
   <div class="space-y-5">
     <div>
-      <h2 class="text-2xl font-black">{{ store.t.paymentTitle }}</h2>
-      <p class="mt-2 text-sm leading-6 text-[#6B6756]">{{ store.t.paymentSubtitle }}</p>
+      <h2 class="text-2xl font-black" dir="auto">{{ store.t.paymentTitle }}</h2>
+      <p class="mt-2 text-sm leading-6 text-[#6B6756]" dir="auto">{{ store.t.paymentSubtitle }}</p>
     </div>
 
     <template v-if="store.selectedMethod?.type === 'promo'">
       <label class="block">
-        <span class="mb-2 block text-sm font-semibold">{{ store.t.promoCode }}</span>
+        <span class="mb-2 block text-sm font-semibold" dir="auto">{{ store.t.promoCode }}</span>
         <input
           v-model="store.promoCode"
           maxlength="32"
+          dir="ltr"
           class="min-h-12 w-full rounded-lg border border-[#EFE6B8] px-4 font-bold uppercase outline-none focus:border-[#202020] focus:ring-4 focus:ring-[#FACE0B]/25"
           placeholder=""
         />
@@ -30,9 +31,9 @@
         v-if="config.isDebug && store.payment?.debugSimulationToken"
         class="rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 p-5 text-amber-950"
       >
-        <p class="text-xs font-black uppercase tracking-wider text-amber-700">{{ store.t.debugOnly }}</p>
-        <h3 class="mt-1 text-xl font-black">{{ store.t.debugWhishTitle }}</h3>
-        <p class="mt-2 text-sm leading-6">{{ store.t.debugWhishBody }}</p>
+        <p class="text-xs font-black uppercase tracking-wider text-amber-700" dir="auto">{{ store.t.debugOnly }}</p>
+        <h3 class="mt-1 text-xl font-black" dir="auto">{{ store.t.debugWhishTitle }}</h3>
+        <p class="mt-2 text-sm leading-6" dir="auto">{{ store.t.debugWhishBody }}</p>
         <div class="mt-5 grid gap-3 sm:grid-cols-2">
           <AppButton
             :disabled="store.loading"
@@ -49,13 +50,13 @@
 
       <section v-if="!store.payment?.debugSimulationToken" class="overflow-hidden rounded-lg border border-[#EFE6B8] bg-white">
         <div class="flex items-center justify-between gap-3 border-b border-[#EFE6B8] bg-[#FFFCED] px-4 py-3">
-          <p class="text-sm font-black text-[#202020]">{{ store.t.whishGuideTitle }}</p>
+          <p class="text-sm font-black text-[#202020]" dir="auto">{{ store.t.whishGuideTitle }}</p>
           <button
             class="rounded-lg px-3 py-2 text-sm font-bold text-[#6B6756] hover:bg-white hover:text-[#202020] disabled:opacity-50"
             :disabled="store.loading"
             @click="openWhish"
           >
-            {{ store.t.skip }}
+            <span dir="auto">{{ store.t.skip }}</span>
           </button>
         </div>
 
@@ -66,11 +67,11 @@
                 {{ activeWhishSlide + 1 }}
               </div>
               <div class="min-w-0">
-                <p class="text-xs font-black uppercase tracking-wide text-[#9B8D45]">
+                <p class="text-xs font-black uppercase tracking-wide text-[#9B8D45]" dir="auto">
                   {{ store.t.stepProgress(activeWhishSlide + 1, whishSlides.length) }}
                 </p>
-                <h3 class="text-xl font-black text-[#202020]">{{ currentWhishSlide.title }}</h3>
-                <p class="mt-1 text-sm leading-6 text-[#6B6756]">{{ currentWhishSlide.body }}</p>
+                <h3 class="text-xl font-black text-[#202020]" dir="auto">{{ currentWhishSlide.title }}</h3>
+                <p class="mt-1 text-sm leading-6 text-[#6B6756]" dir="auto">{{ currentWhishSlide.body }}</p>
               </div>
             </div>
 
@@ -90,7 +91,7 @@
             :disabled="activeWhishSlide === 0 || store.loading"
             @click="activeWhishSlide -= 1"
           >
-            {{ store.t.previous }}
+            <span dir="auto">{{ store.t.previous }}</span>
           </button>
 
           <div class="flex items-center gap-2">
@@ -109,15 +110,15 @@
             :disabled="store.loading"
             @click="advanceWhish"
           >
-            {{ isLastWhishSlide ? store.t.continueToWhish : store.t.next }}
+            <span dir="auto">{{ isLastWhishSlide ? store.t.continueToWhish : store.t.next }}</span>
           </button>
         </div>
       </section>
 
       <aside class="flex flex-col gap-3 rounded-lg border border-[#EFE6B8] bg-[#FFFCED] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p class="font-black text-[#202020]">{{ store.t.needPaymentHelp }}</p>
-          <p class="mt-1 text-sm leading-5 text-[#6B6756]">{{ store.t.paymentHelpBody }}</p>
+          <p class="font-black text-[#202020]" dir="auto">{{ store.t.needPaymentHelp }}</p>
+          <p class="mt-1 text-sm leading-5 text-[#6B6756]" dir="auto">{{ store.t.paymentHelpBody }}</p>
         </div>
         <a
           :href="config.identity.whatsappUrl"
@@ -126,7 +127,7 @@
           class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#25D366] bg-white px-4 text-sm font-bold text-[#202020] transition hover:bg-[#25D366]/10"
         >
           <img src="/assets/payment/whatsapp.svg" alt="" class="h-5 w-5 shrink-0" />
-          {{ store.t.contactSupport }}
+          <span dir="auto">{{ store.t.contactSupport }}</span>
         </a>
       </aside>
 
@@ -139,12 +140,12 @@
       >
         <template v-if="smsSetupError">
           <AlertTriangle class="mx-auto mb-3 h-8 w-8 text-red-600" />
-          <p class="mx-auto max-w-lg text-sm leading-6 text-red-800">{{ inlineSmsError }}</p>
+          <p class="mx-auto max-w-lg text-sm leading-6 text-red-800" dir="auto">{{ inlineSmsError }}</p>
           <button
             class="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-800 transition hover:border-red-300 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
             @click="editRegisteredPhone"
           >
-            {{ store.t.editPhone }}
+            <span dir="auto">{{ store.t.editPhone }}</span>
           </button>
         </template>
         <template v-else>
@@ -155,27 +156,27 @@
             class="mx-auto mb-3 h-12 w-12 rounded-lg object-contain"
           />
           <template v-if="isMobileDevice">
-            <h3 class="text-xl font-black text-[#202020]">{{ store.t.smsSimpleTitle }}</h3>
-            <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6B6756]">{{ store.t.smsSimpleBody }}</p>
+            <h3 class="text-xl font-black text-[#202020]" dir="auto">{{ store.t.smsSimpleTitle }}</h3>
+            <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6B6756]" dir="auto">{{ store.t.smsSimpleBody }}</p>
           </template>
-          <p v-else class="mx-auto max-w-lg text-sm font-bold leading-6 text-[#202020]">{{ store.t.smsDesktopInstruction }}</p>
+          <p v-else class="mx-auto max-w-lg text-sm font-bold leading-6 text-[#202020]" dir="auto">{{ store.t.smsDesktopInstruction }}</p>
         </template>
       </div>
 
       <section v-if="!isMobileDevice && !smsSetupError" class="rounded-lg border border-[#EFE6B8] bg-white p-4 sm:p-6">
         <div class="grid gap-4 md:grid-cols-2">
           <div class="rounded-xl border-2 p-4 text-center sm:p-5" :style="smsInstructionCardStyle">
-            <p class="text-xs font-black uppercase tracking-wider sm:text-sm" :style="{ color: smsCarrierColor }">{{ store.t.smsSendTo }}</p>
+            <p class="text-xs font-black uppercase tracking-wider sm:text-sm" :style="{ color: smsCarrierColor }" dir="auto">{{ store.t.smsSendTo }}</p>
             <p class="mt-2 break-all font-mono text-4xl font-black text-[#202020]" dir="ltr">{{ smsShortCode }}</p>
           </div>
 
           <div class="rounded-xl border-2 p-4 text-center sm:p-5" :style="smsInstructionCardStyle">
-            <p class="text-xs font-black uppercase tracking-wider sm:text-sm" :style="{ color: smsCarrierColor }">{{ store.t.smsBodyLabel }}</p>
+            <p class="text-xs font-black uppercase tracking-wider sm:text-sm" :style="{ color: smsCarrierColor }" dir="auto">{{ store.t.smsBodyLabel }}</p>
             <p class="mt-2 break-all font-mono text-2xl font-black text-[#202020] sm:text-3xl" dir="ltr">{{ smsMessageBody }}</p>
           </div>
         </div>
 
-        <p class="mx-auto mt-4 max-w-lg text-center text-sm leading-6 text-[#6B6756]">
+        <p class="mx-auto mt-4 max-w-lg text-center text-sm leading-6 text-[#6B6756]" dir="auto">
           {{ store.t.smsDesktopAmountHint(smsTransferAmount, store.selectedMethod?.title) }}
         </p>
       </section>
@@ -191,7 +192,7 @@
               : 'border-[#8AB4D8] bg-[#EEF7FF]'
         "
       >
-        <h3 class="text-xl font-black text-[#202020]">
+        <h3 class="text-xl font-black text-[#202020]" dir="auto">
           {{
             store.smsAwaitingConfirmation
               ? store.t.smsConfirmingTitle
@@ -200,7 +201,7 @@
                 : store.t.smsPendingTitle
           }}
         </h3>
-        <p class="mt-2 text-sm leading-6 text-[#6B6756]">
+        <p class="mt-2 text-sm leading-6 text-[#6B6756]" dir="auto">
           {{
             store.smsAwaitingConfirmation
               ? store.t.smsConfirmingBody
@@ -212,12 +213,12 @@
 
         <div class="mt-4 grid grid-cols-2 gap-3">
           <div class="rounded-lg bg-white p-3">
-            <p class="text-xs font-bold uppercase text-[#6B6756]">{{ store.t.collectedSoFar }}</p>
-            <p class="mt-1 text-2xl font-black text-[#202020]">${{ store.smsLastCollected }}</p>
+            <p class="text-xs font-bold uppercase text-[#6B6756]" dir="auto">{{ store.t.collectedSoFar }}</p>
+            <p class="mt-1 text-2xl font-black text-[#202020]" dir="ltr">${{ store.smsLastCollected }}</p>
           </div>
           <div class="rounded-lg bg-white p-3">
-            <p class="text-xs font-bold uppercase text-[#6B6756]">{{ store.t.remaining }}</p>
-            <p class="mt-1 text-2xl font-black text-[#202020]">${{ store.smsRemaining }}</p>
+            <p class="text-xs font-bold uppercase text-[#6B6756]" dir="auto">{{ store.t.remaining }}</p>
+            <p class="mt-1 text-2xl font-black text-[#202020]" dir="ltr">${{ store.smsRemaining }}</p>
           </div>
         </div>
 
@@ -236,14 +237,14 @@
           :disabled="store.loading"
           @click="store.sendNextSms()"
         >
-          {{ store.t.sendUnits }}
+          <span dir="auto">{{ store.t.sendUnits }}</span>
         </button>
       </div>
 
       <aside class="flex flex-col gap-3 rounded-lg border border-[#EFE6B8] bg-[#FFFCED] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p class="font-black text-[#202020]">{{ store.t.needPaymentHelp }}</p>
-          <p class="mt-1 text-sm leading-5 text-[#6B6756]">{{ store.t.paymentHelpBody }}</p>
+          <p class="font-black text-[#202020]" dir="auto">{{ store.t.needPaymentHelp }}</p>
+          <p class="mt-1 text-sm leading-5 text-[#6B6756]" dir="auto">{{ store.t.paymentHelpBody }}</p>
         </div>
         <a
           :href="config.identity.whatsappUrl"
@@ -252,7 +253,7 @@
           class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#25D366] bg-white px-4 text-sm font-bold text-[#202020] transition hover:bg-[#25D366]/10"
         >
           <img src="/assets/payment/whatsapp.svg" alt="" class="h-5 w-5 shrink-0" />
-          {{ store.t.contactSupport }}
+          <span dir="auto">{{ store.t.contactSupport }}</span>
         </a>
       </aside>
 

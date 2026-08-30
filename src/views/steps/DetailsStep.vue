@@ -1,8 +1,8 @@
 <template>
   <form class="space-y-5" @submit.prevent="submit">
     <div>
-      <h2 class="text-2xl font-black">{{ store.t.detailsTitle }}</h2>
-      <p class="mt-2 text-sm leading-6 text-[#6B6756]">{{ store.t.detailsSubtitle }}</p>
+      <h2 class="text-2xl font-black" dir="auto">{{ store.t.detailsTitle }}</h2>
+      <p class="mt-2 text-sm leading-6 text-[#6B6756]" dir="auto">{{ store.t.detailsSubtitle }}</p>
     </div>
 
     <PhoneInput
@@ -22,7 +22,7 @@
         :disabled="!accountPhoneCanSendUnits"
         @change="samePhoneChanged"
       />
-      {{ store.t.useSamePhone }}
+      <span dir="auto">{{ store.t.useSamePhone }}</span>
     </label>
 
     <AppButton type="submit" class="w-full">{{ store.t.continue }}</AppButton>

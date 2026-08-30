@@ -2,7 +2,7 @@
   <div v-if="open" class="fixed inset-0 z-50 grid place-items-end bg-[#202020]/45 p-0 backdrop-blur-sm sm:place-items-center sm:p-6" @click.self="$emit('close')">
     <section ref="panelRef" class="max-h-[92svh] w-full overflow-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:max-w-2xl sm:rounded-2xl">
       <div class="mb-4 flex items-center justify-between gap-4">
-        <h2 class="text-lg font-bold text-[#202020]">{{ title }}</h2>
+        <h2 class="text-lg font-bold text-[#202020]" dir="auto">{{ title }}</h2>
         <button class="rounded-full p-2 text-[#6B6756] hover:bg-[#FFF8D7]" @click="$emit('close')" :aria-label="closeLabel">
           <X class="h-5 w-5" />
         </button>
@@ -14,9 +14,9 @@
             {{ activeIndex + 1 }}
           </div>
           <div class="min-w-0">
-            <p class="text-xs font-bold uppercase tracking-wide text-[#9B8D45]">{{ progressLabel(activeIndex + 1, steps.length) }}</p>
-            <h3 class="text-xl font-black text-[#202020]">{{ activeStep.title }}</h3>
-            <p class="mt-1 text-base leading-7 text-[#6B6756]">{{ activeStep.body }}</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-[#9B8D45]" dir="auto">{{ progressLabel(activeIndex + 1, steps.length) }}</p>
+            <h3 class="text-xl font-black text-[#202020]" dir="auto">{{ activeStep.title }}</h3>
+            <p class="mt-1 text-base leading-7 text-[#6B6756]" dir="auto">{{ activeStep.body }}</p>
           </div>
         </div>
 
@@ -28,7 +28,7 @@
       <div class="mt-4 flex items-center justify-between gap-3">
         <button class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#EFE6B8] px-4 text-sm font-bold disabled:opacity-40" :disabled="activeIndex === 0" @click="previous">
           <ChevronLeft class="h-4 w-4" />
-          {{ previousLabel }}
+          <span dir="auto">{{ previousLabel }}</span>
         </button>
         <div class="flex items-center gap-2">
           <button
@@ -41,7 +41,7 @@
           />
         </div>
         <button class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#202020] px-4 text-sm font-bold text-[#FACE0B]" @click="next">
-          {{ isLastStep ? closeLabel : nextLabel }}
+          <span dir="auto">{{ isLastStep ? closeLabel : nextLabel }}</span>
           <X v-if="isLastStep" class="h-4 w-4" />
           <ChevronRight v-else class="h-4 w-4" />
         </button>
